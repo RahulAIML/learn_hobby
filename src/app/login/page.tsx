@@ -2,6 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+import { LoginForm } from '@/components/auth/LoginForm';
 import { ArrowLeft, LogIn } from 'lucide-react';
 
 export const metadata = {
@@ -24,42 +25,7 @@ export default function LoginPage() {
             <p className="text-sm text-slate-500 mt-1.5">Sign in to continue your learning journey.</p>
           </div>
 
-          <form className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-xs font-bold text-slate-700 mb-1.5">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/40 focus:border-red-400 transition-colors"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-xs font-bold text-slate-700 mb-1.5">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/40 focus:border-red-400 transition-colors"
-              />
-            </div>
-            <button
-              type="button"
-              disabled
-              className="w-full py-3 rounded-xl text-sm font-bold text-white bg-red-700/70 cursor-not-allowed"
-            >
-              Sign In
-            </button>
-            <p className="text-center text-xs text-slate-400">
-              Authentication is not yet connected. This page is a frontend placeholder.
-            </p>
-          </form>
+          <LoginForm />
 
           <Link
             href="/"
