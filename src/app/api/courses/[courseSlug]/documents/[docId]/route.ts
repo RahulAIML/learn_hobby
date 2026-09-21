@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateUploadedFile } from '@/lib/assessment/fileValidation.server';
 import { getDocument, replaceDocument, deleteDocument } from '@/lib/courseDocuments/store';
 import { toSummary } from '@/lib/courseDocuments/types';
+import { getSessionUser } from '@/lib/auth/session';
+import { isEnrolled } from '@/lib/auth/store';
 
 export const runtime = 'nodejs';
 
@@ -9,8 +11,25 @@ interface RouteParams {
   params: { courseSlug: string; docId: string };
 }
 
-/** Streams the raw file bytes back — used for both "view online" (PDF/images) and "download". */
+/**
+ * Streams the raw file bytes back — used for both "view online" (PDF/images)
+ * and "download".
+ *
+ * AUTHORIZATION (critical): this is the actual content-delivery endpoint,
+ * so it is the one that must genuinely enforce access — not just hide a
+ * button in the UI. The caller must be signed in, and if they are a
+ * student, they must be enrolled in this document's course. An unguessable
+ * document id is NOT treated as sufficient protection on its own.
+ */
 export async function GET(req: NextRequest, { params }: RouteParams) {
+  const user = getSessionUser(req);
+  if (!user) {
+    return NextResponse.json({ success: false, error: { code: 'unauthenticated', message: 'Please sign in to view this document.' } }, { status: 401 });
+  }
+  if (user.role === 'student' && !isEnrolled(user.id, params.courseSlug)) {
+    return NextResponse.json({ success: false, error: { code: 'forbidden', message: 'You are not enrolled in this course.' } }, { status: 403 });
+  }
+
   const doc = getDocument(params.courseSlug, params.docId);
   if (!doc) {
     return NextResponse.json({ success: false, error: { code: 'document_not_found', message: 'Document not found.' } }, { status: 404 });

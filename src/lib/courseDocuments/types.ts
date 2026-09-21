@@ -6,6 +6,7 @@ export interface Course {
 export interface CourseDocument {
   id: string;
   courseSlug: string;
+  moduleId: string | null;
   title: string;
   filename: string;
   mimeType: string;
@@ -20,6 +21,7 @@ export interface CourseDocument {
 export interface CourseDocumentSummary {
   id: string;
   courseSlug: string;
+  moduleId: string | null;
   title: string;
   filename: string;
   mimeType: string;

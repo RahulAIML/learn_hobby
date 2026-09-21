@@ -28,6 +28,7 @@ export function getDocument(courseSlug: string, id: string): CourseDocument | un
 
 export interface CreateDocumentInput {
   courseSlug: string;
+  moduleId?: string | null;
   title: string;
   filename: string;
   mimeType: string;
@@ -40,6 +41,7 @@ export function createDocument(input: CreateDocumentInput): CourseDocument {
   const doc: CourseDocument = {
     id: randomUUID(),
     courseSlug: input.courseSlug,
+    moduleId: input.moduleId ?? null,
     title: input.title,
     filename: input.filename,
     mimeType: input.mimeType,

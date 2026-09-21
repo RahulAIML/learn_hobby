@@ -2,14 +2,15 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { FileText, Download, Eye, Loader2, AlertCircle, BookOpen, ArrowRight } from 'lucide-react';
+import { FileText, Download, Eye, Loader2, AlertCircle, ArrowRight, ClipboardList } from 'lucide-react';
 import { formatBytes } from '@/lib/assessment/fileValidation';
 import type { CourseDocumentSummary } from '@/lib/courseDocuments/types';
-import type { Module } from '@/lib/modules/types';
 
-interface CourseDocumentListProps {
+interface ModulePageProps {
   courseSlug: string;
-  courseTitle: string;
+  moduleId: string;
+  moduleTitle: string;
+  assessmentId: string | null;
 }
 
 type ListState =
@@ -17,71 +18,39 @@ type ListState =
   | { status: 'error'; message: string }
   | { status: 'loaded'; documents: CourseDocumentSummary[] };
 
-export const CourseDocumentList: React.FC<CourseDocumentListProps> = ({ courseSlug, courseTitle }) => {
+export const ModulePage: React.FC<ModulePageProps> = ({ courseSlug, moduleId, moduleTitle, assessmentId }) => {
   const [state, setState] = useState<ListState>({ status: 'loading' });
-  const [modules, setModules] = useState<Module[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    setState({ status: 'loading' });
-
     fetch(`/api/courses/${courseSlug}/documents`)
       .then(async (res) => {
         const body = await res.json();
-        if (!res.ok || !body.success) {
-          throw new Error(body?.error?.message ?? 'Could not load documents for this course.');
+        if (!res.ok || !body.success) throw new Error(body?.error?.message ?? 'Could not load documents.');
+        if (!cancelled) {
+          const filtered = (body.documents as CourseDocumentSummary[]).filter((d) => d.moduleId === moduleId);
+          setState({ status: 'loaded', documents: filtered });
         }
-        if (!cancelled) setState({ status: 'loaded', documents: body.documents });
       })
       .catch((err: Error) => {
         if (!cancelled) setState({ status: 'error', message: err.message });
       });
-
-    fetch(`/api/courses/${courseSlug}/modules`)
-      .then((res) => res.json())
-      .then((body) => {
-        if (!cancelled && body.success) setModules(body.modules);
-      })
-      .catch(() => {});
-
     return () => {
       cancelled = true;
     };
-  }, [courseSlug]);
+  }, [courseSlug, moduleId]);
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
       <div className="mb-8">
-        <span className="text-xs font-extrabold text-red-600 uppercase tracking-wider">{courseTitle}</span>
+        <span className="text-xs font-extrabold text-red-600 uppercase tracking-wider">{moduleTitle}</span>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-950 font-heading tracking-tight mt-1.5">
-          Course Documents
+          Module Documents
         </h1>
         <p className="text-sm text-slate-600 leading-relaxed mt-2">
-          View or download the study materials for this course.
+          Study the materials below, then take the module assessment.
         </p>
       </div>
-
-      {modules.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-3">Modules</h2>
-          <ul className="space-y-2">
-            {modules.map((mod) => (
-              <li key={mod.id}>
-                <Link
-                  href={`/courses/${courseSlug}/modules/${mod.id}`}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-red-300 transition-colors group"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <BookOpen className="w-4 h-4 text-red-600 flex-shrink-0" />
-                    <span className="text-sm font-bold text-slate-900 truncate">{mod.title}</span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-red-600 transition-colors flex-shrink-0" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       {state.status === 'loading' && (
         <div className="flex items-center justify-center gap-2 py-16 text-slate-400">
@@ -100,7 +69,7 @@ export const CourseDocumentList: React.FC<CourseDocumentListProps> = ({ courseSl
       {state.status === 'loaded' && state.documents.length === 0 && (
         <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-8 text-center">
           <FileText className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-500">No documents have been added to this course yet.</p>
+          <p className="text-sm text-slate-500">No documents have been added to this module yet.</p>
         </div>
       )}
 
@@ -144,6 +113,23 @@ export const CourseDocumentList: React.FC<CourseDocumentListProps> = ({ courseSl
             </li>
           ))}
         </ul>
+      )}
+
+      {assessmentId && (
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-red-100 bg-red-50/50 p-5 sm:p-6">
+          <div>
+            <p className="text-sm font-bold text-slate-900">Ready to check your understanding?</p>
+            <p className="text-xs text-slate-600 mt-0.5">Complete the module assessment and get instant AI feedback.</p>
+          </div>
+          <Link
+            href={`/assessments/${assessmentId}`}
+            className="flex-shrink-0 w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/25 transition-all duration-200"
+          >
+            <ClipboardList className="w-4 h-4" />
+            <span>Take the Assessment</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
       )}
     </div>
   );

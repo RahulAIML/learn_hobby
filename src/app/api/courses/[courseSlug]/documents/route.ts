@@ -3,6 +3,8 @@ import { getCourse } from '@/data/courses';
 import { validateUploadedFile } from '@/lib/assessment/fileValidation.server';
 import { listDocuments, createDocument } from '@/lib/courseDocuments/store';
 import { toSummary } from '@/lib/courseDocuments/types';
+import { getSessionUser } from '@/lib/auth/session';
+import { isEnrolled } from '@/lib/auth/store';
 
 export const runtime = 'nodejs';
 
@@ -10,11 +12,24 @@ interface RouteParams {
   params: { courseSlug: string };
 }
 
-/** List all documents for a course (no per-user enrollment check — see route-level note below). */
-export async function GET(_req: NextRequest, { params }: RouteParams) {
+/**
+ * List documents for a course.
+ *
+ * ACCESS CONTROL: a signed-in student must be enrolled in the course.
+ * An anonymous caller (no session cookie) is allowed through — this is
+ * what the admin dashboard uses today, since /admin has no admin-role
+ * auth yet (documented, disclosed limitation there, unchanged by this
+ * feature). A logged-in student who is NOT enrolled is rejected with 403.
+ */
+export async function GET(req: NextRequest, { params }: RouteParams) {
   const course = getCourse(params.courseSlug);
   if (!course) {
     return NextResponse.json({ success: false, error: { code: 'course_not_found', message: 'Course not found.' } }, { status: 404 });
+  }
+
+  const user = getSessionUser(req);
+  if (user && user.role === 'student' && !isEnrolled(user.id, params.courseSlug)) {
+    return NextResponse.json({ success: false, error: { code: 'forbidden', message: 'You are not enrolled in this course.' } }, { status: 403 });
   }
 
   const documents = listDocuments(params.courseSlug).map(toSummary);
@@ -50,6 +65,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
   }
 
   const title = formData.get('title')?.toString().trim() || file.name;
+  const moduleId = formData.get('moduleId')?.toString().trim() || null;
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const validation = await validateUploadedFile(file.name, buffer);
@@ -59,6 +75,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
   const doc = createDocument({
     courseSlug: params.courseSlug,
+    moduleId,
     title,
     filename: validation.safeFilename ?? file.name,
     mimeType: validation.detectedMime ?? file.type,

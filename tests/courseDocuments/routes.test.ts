@@ -7,8 +7,18 @@ import {
   DELETE as docDELETE,
 } from '@/app/api/courses/[courseSlug]/documents/[docId]/route';
 import { listDocuments, deleteDocument } from '@/lib/courseDocuments/store';
+import { getUserByEmail, createUser, enrollUser } from '@/lib/auth/store';
+import { createSessionToken, SESSION_COOKIE } from '@/lib/auth/session';
 
 const COURSE = 'data-science';
+
+const enrolledStudent = getUserByEmail('student@gurukul.dev')!;
+const enrolledCookie = `${SESSION_COOKIE}=${createSessionToken(enrolledStudent.id)}`;
+
+const outsiderResult = createUser({ email: 'outsider@gurukul.dev', password: 'outsider123', name: 'Outsider' });
+const outsider = 'user' in outsiderResult ? outsiderResult.user : (() => { throw new Error('setup failed'); })();
+enrollUser(outsider.id, 'some-other-course');
+const outsiderCookie = `${SESSION_COOKIE}=${createSessionToken(outsider.id)}`;
 
 function pdfFile(name = 'doc.pdf'): File {
   const header = new TextEncoder().encode('%PDF-1.4\n');
@@ -17,12 +27,12 @@ function pdfFile(name = 'doc.pdf'): File {
   return new File([bytes], name, { type: 'application/pdf' });
 }
 
-function requestWithForm(url: string, formData: FormData, method: string): NextRequest {
-  return new Request(url, { method, body: formData }) as unknown as NextRequest;
+function requestWithForm(url: string, formData: FormData, method: string, cookie?: string): NextRequest {
+  return new NextRequest(url, { method, body: formData, headers: cookie ? { cookie } : undefined });
 }
 
-function plainRequest(url: string, method: string): NextRequest {
-  return new Request(url, { method }) as unknown as NextRequest;
+function plainRequest(url: string, method: string, cookie?: string): NextRequest {
+  return new NextRequest(url, { method, headers: cookie ? { cookie } : undefined });
 }
 
 describe('course documents API routes', () => {
@@ -82,15 +92,29 @@ describe('course documents API routes', () => {
     // The summary must never leak the raw base64 payload.
     expect(listed.documents[0].data).toBeUndefined();
 
-    // Download / view
+    // Download / view — requires an authenticated, enrolled student
     const downloadRes = await docGET(
-      plainRequest(`http://localhost/api/courses/data-science/documents/${docId}?download=1`, 'GET'),
+      plainRequest(`http://localhost/api/courses/data-science/documents/${docId}?download=1`, 'GET', enrolledCookie),
       { params: { courseSlug: COURSE, docId } }
     );
     expect(downloadRes.status).toBe(200);
     expect(downloadRes.headers.get('Content-Disposition')).toContain('attachment');
     const bytes = Buffer.from(await downloadRes.arrayBuffer());
     expect(bytes.toString('utf-8')).toContain('%PDF-1.4');
+
+    // Unauthenticated caller is rejected outright
+    const anonRes = await docGET(plainRequest(`http://localhost/api/courses/data-science/documents/${docId}`, 'GET'), {
+      params: { courseSlug: COURSE, docId },
+    });
+    expect(anonRes.status).toBe(401);
+
+    // A signed-in student who is NOT enrolled in this course is rejected too —
+    // an unguessable document id is not treated as sufficient protection.
+    const forbiddenRes = await docGET(
+      plainRequest(`http://localhost/api/courses/data-science/documents/${docId}`, 'GET', outsiderCookie),
+      { params: { courseSlug: COURSE, docId } }
+    );
+    expect(forbiddenRes.status).toBe(403);
 
     // Replace
     const replaceFd = new FormData();

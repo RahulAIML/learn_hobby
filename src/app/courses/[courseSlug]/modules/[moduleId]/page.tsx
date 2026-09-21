@@ -2,27 +2,23 @@ import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { ShieldAlert, LogIn } from 'lucide-react';
+import { LogIn, ShieldAlert } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
-import { CourseDocumentList } from '@/components/courses/CourseDocumentList';
-import { getCourse, courses } from '@/data/courses';
+import { ModulePage } from '@/components/courses/ModulePage';
+import { getCourse } from '@/data/courses';
+import { getModule } from '@/lib/modules/store';
+import { getAssessmentByModule } from '@/lib/assessments/store';
 import { SESSION_COOKIE, getSessionUserFromCookieValue } from '@/lib/auth/session';
 import { isEnrolled } from '@/lib/auth/store';
 
 interface Props {
-  params: { courseSlug: string };
-}
-
-export function generateStaticParams() {
-  return courses.map((c) => ({ courseSlug: c.slug }));
+  params: { courseSlug: string; moduleId: string };
 }
 
 export function generateMetadata({ params }: Props) {
-  const course = getCourse(params.courseSlug);
-  return {
-    title: course ? `${course.title} — Documents | Gurukul` : 'Course Documents | Gurukul',
-  };
+  const mod = getModule(params.courseSlug, params.moduleId);
+  return { title: mod ? `${mod.title} | Gurukul` : 'Module | Gurukul' };
 }
 
 function GateMessage({ icon: Icon, title, message, showLogin }: { icon: typeof ShieldAlert; title: string; message: string; showLogin?: boolean }) {
@@ -46,38 +42,36 @@ function GateMessage({ icon: Icon, title, message, showLogin }: { icon: typeof S
   );
 }
 
-export default function CourseDocumentsPage({ params }: Props) {
+export default function CourseModulePage({ params }: Props) {
   const course = getCourse(params.courseSlug);
   if (!course) notFound();
+  const mod = getModule(params.courseSlug, params.moduleId);
+  if (!mod) notFound();
 
   const token = cookies().get(SESSION_COOKIE)?.value;
   const user = getSessionUserFromCookieValue(token);
 
   let gate: React.ReactNode = null;
   if (!user) {
-    gate = (
-      <GateMessage
-        icon={LogIn}
-        title="Sign In Required"
-        message="Course documents are only available to enrolled students. Please sign in to continue."
-        showLogin
-      />
-    );
+    gate = <GateMessage icon={LogIn} title="Sign In Required" message="Please sign in to access this module." showLogin />;
   } else if (user.role === 'student' && !isEnrolled(user.id, course.slug)) {
-    gate = (
-      <GateMessage
-        icon={ShieldAlert}
-        title="Not Enrolled"
-        message={`You are not enrolled in ${course.title}, so its documents aren't available to your account.`}
-      />
-    );
+    gate = <GateMessage icon={ShieldAlert} title="Not Enrolled" message={`You are not enrolled in ${course.title}.`} />;
   }
+
+  const assessment = getAssessmentByModule(mod.id);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <Navbar variant="light" />
       <main className="flex-1">
-        {gate ?? <CourseDocumentList courseSlug={course.slug} courseTitle={course.title} />}
+        {gate ?? (
+          <ModulePage
+            courseSlug={course.slug}
+            moduleId={mod.id}
+            moduleTitle={mod.title}
+            assessmentId={assessment && assessment.status === 'active' ? assessment.id : null}
+          />
+        )}
       </main>
       <Footer />
     </div>
