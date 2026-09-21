@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth/session';
-import { isEnrolled } from '@/lib/auth/store';
 import { getAssessmentById } from '@/lib/assessments/store';
 import { createSubmission, saveEvaluation, markFailed, listSubmissionsForStudent } from '@/lib/submissions/store';
 import { evaluateAssessment, AssessmentServiceError } from '@/lib/assessment/assessmentService';
@@ -37,7 +36,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     return errorResponse('assessment_not_found', 'Assessment not found.', 404);
   }
 
-  if (!isEnrolled(user.id, assessment.courseSlug)) {
+  if (!user.enrollments.includes(assessment.courseSlug)) {
     return errorResponse('forbidden', 'You are not enrolled in this course.', 403);
   }
 
@@ -118,7 +117,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     return errorResponse('assessment_not_found', 'Assessment not found.', 404);
   }
 
-  if (!isEnrolled(user.id, assessment.courseSlug)) {
+  if (!user.enrollments.includes(assessment.courseSlug)) {
     return errorResponse('forbidden', 'You are not enrolled in this course.', 403);
   }
 

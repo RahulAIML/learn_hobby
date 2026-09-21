@@ -4,7 +4,6 @@ import { validateUploadedFile } from '@/lib/assessment/fileValidation.server';
 import { listDocuments, createDocument } from '@/lib/courseDocuments/store';
 import { toSummary } from '@/lib/courseDocuments/types';
 import { getSessionUser } from '@/lib/auth/session';
-import { isEnrolled } from '@/lib/auth/store';
 
 export const runtime = 'nodejs';
 
@@ -28,7 +27,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   }
 
   const user = getSessionUser(req);
-  if (user && user.role === 'student' && !isEnrolled(user.id, params.courseSlug)) {
+  if (user && user.role === 'student' && !user.enrollments.includes(params.courseSlug)) {
     return NextResponse.json({ success: false, error: { code: 'forbidden', message: 'You are not enrolled in this course.' } }, { status: 403 });
   }
 

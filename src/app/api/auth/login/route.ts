@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getUserByEmail } from '@/lib/auth/store';
+import { getUserByEmail, listEnrollments } from '@/lib/auth/store';
 import { verifyPassword } from '@/lib/auth/password';
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from '@/lib/auth/session';
 import { toPublicUser } from '@/lib/auth/types';
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: { code: 'invalid_credentials', message: 'Incorrect email or password.' } }, { status: 401 });
   }
 
-  const token = createSessionToken(user.id);
+  const token = createSessionToken(toPublicUser(user), listEnrollments(user.id));
   const res = NextResponse.json({ success: true, user: toPublicUser(user) });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
   return res;

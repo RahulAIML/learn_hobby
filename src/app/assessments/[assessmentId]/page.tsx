@@ -8,7 +8,6 @@ import { Footer } from '@/components/layout/Footer';
 import { StudentAssessmentPage } from '@/components/assessment/StudentAssessmentPage';
 import { getAssessmentById } from '@/lib/assessments/store';
 import { SESSION_COOKIE, getSessionUserFromCookieValue } from '@/lib/auth/session';
-import { isEnrolled } from '@/lib/auth/store';
 
 interface Props {
   params: { assessmentId: string };
@@ -50,7 +49,7 @@ export default function AssessmentDetailPage({ params }: Props) {
   let gate: React.ReactNode = null;
   if (!user) {
     gate = <GateMessage icon={LogIn} title="Sign In Required" message="Please sign in to access this assessment." showLogin />;
-  } else if (user.role === 'student' && !isEnrolled(user.id, assessment.courseSlug)) {
+  } else if (user.role === 'student' && !user.enrollments.includes(assessment.courseSlug)) {
     gate = (
       <GateMessage
         icon={ShieldAlert}

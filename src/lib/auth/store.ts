@@ -91,6 +91,12 @@ export function isEnrolled(userId: string, courseSlug: string): boolean {
   return !!row;
 }
 
+/** All course slugs a user is enrolled in — embedded into the session JWT at login time. */
+export function listEnrollments(userId: string): string[] {
+  const rows = getDb().prepare('SELECT course_slug FROM enrollments WHERE user_id = ?').all(userId) as { course_slug: string }[];
+  return rows.map((r) => r.course_slug);
+}
+
 export function enrollUser(userId: string, courseSlug: string): void {
   getDb()
     .prepare('INSERT OR IGNORE INTO enrollments (user_id, course_slug, enrolled_at) VALUES (?, ?, ?)')

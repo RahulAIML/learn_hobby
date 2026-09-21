@@ -10,7 +10,6 @@ import { getCourse } from '@/data/courses';
 import { getModule } from '@/lib/modules/store';
 import { getAssessmentByModule } from '@/lib/assessments/store';
 import { SESSION_COOKIE, getSessionUserFromCookieValue } from '@/lib/auth/session';
-import { isEnrolled } from '@/lib/auth/store';
 
 interface Props {
   params: { courseSlug: string; moduleId: string };
@@ -54,7 +53,7 @@ export default function CourseModulePage({ params }: Props) {
   let gate: React.ReactNode = null;
   if (!user) {
     gate = <GateMessage icon={LogIn} title="Sign In Required" message="Please sign in to access this module." showLogin />;
-  } else if (user.role === 'student' && !isEnrolled(user.id, course.slug)) {
+  } else if (user.role === 'student' && !user.enrollments.includes(course.slug)) {
     gate = <GateMessage icon={ShieldAlert} title="Not Enrolled" message={`You are not enrolled in ${course.title}.`} />;
   }
 

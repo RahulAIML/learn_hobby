@@ -1,13 +1,16 @@
 import jwt from 'jsonwebtoken';
 import type { NextRequest } from 'next/server';
-import { getUserById } from './store';
-import type { User } from './types';
+import type { PublicUser, SessionUser } from './types';
 
 export const SESSION_COOKIE = 'gurukul_session';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 interface SessionPayload {
   sub: string; // userId
+  email: string;
+  name: string;
+  role: SessionUser['role'];
+  enrollments: string[];
 }
 
 function getSecret(): string {
@@ -18,15 +21,30 @@ function getSecret(): string {
   return secret;
 }
 
-export function createSessionToken(userId: string): string {
-  const payload: SessionPayload = { sub: userId };
+/**
+ * The session is self-contained: role and enrollments are embedded in the
+ * signed JWT at login time, not re-resolved from the DB on every request.
+ * This matters because on Vercel each serverless instance has its own
+ * ephemeral /tmp SQLite file (src/lib/db/sqlite.ts) — a DB lookup here
+ * would resolve inconsistently depending on which instance handles the
+ * request. The JWT signature is the source of truth instead.
+ */
+export function createSessionToken(user: PublicUser, enrollments: string[]): string {
+  const payload: SessionPayload = { sub: user.id, email: user.email, name: user.name, role: user.role, enrollments };
   return jwt.sign(payload, getSecret(), { expiresIn: SESSION_MAX_AGE_SECONDS });
 }
 
-export function verifySessionToken(token: string): string | null {
+function decodeSessionToken(token: string): SessionUser | null {
   try {
     const decoded = jwt.verify(token, getSecret()) as SessionPayload;
-    return decoded.sub ?? null;
+    if (!decoded.sub) return null;
+    return {
+      id: decoded.sub,
+      email: decoded.email,
+      name: decoded.name,
+      role: decoded.role,
+      enrollments: decoded.enrollments ?? [],
+    };
   } catch {
     return null;
   }
@@ -41,20 +59,14 @@ export const sessionCookieOptions = {
 };
 
 /** Resolves the authenticated user from the request's session cookie (a signed JWT), or null. */
-export function getSessionUser(req: NextRequest): User | null {
+export function getSessionUser(req: NextRequest): SessionUser | null {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-
-  const userId = verifySessionToken(token);
-  if (!userId) return null;
-
-  return getUserById(userId) ?? null;
+  return decodeSessionToken(token);
 }
 
 /** Same as getSessionUser, but for Server Components/pages using next/headers' cookies() instead of a NextRequest. */
-export function getSessionUserFromCookieValue(cookieValue: string | undefined): User | null {
+export function getSessionUserFromCookieValue(cookieValue: string | undefined): SessionUser | null {
   if (!cookieValue) return null;
-  const userId = verifySessionToken(cookieValue);
-  if (!userId) return null;
-  return getUserById(userId) ?? null;
+  return decodeSessionToken(cookieValue);
 }

@@ -7,18 +7,19 @@ import {
   DELETE as docDELETE,
 } from '@/app/api/courses/[courseSlug]/documents/[docId]/route';
 import { listDocuments, deleteDocument } from '@/lib/courseDocuments/store';
-import { getUserByEmail, createUser, enrollUser } from '@/lib/auth/store';
+import { getUserByEmail, createUser, enrollUser, listEnrollments } from '@/lib/auth/store';
 import { createSessionToken, SESSION_COOKIE } from '@/lib/auth/session';
+import { toPublicUser } from '@/lib/auth/types';
 
 const COURSE = 'data-science';
 
 const enrolledStudent = getUserByEmail('student@gurukul.dev')!;
-const enrolledCookie = `${SESSION_COOKIE}=${createSessionToken(enrolledStudent.id)}`;
+const enrolledCookie = `${SESSION_COOKIE}=${createSessionToken(toPublicUser(enrolledStudent), listEnrollments(enrolledStudent.id))}`;
 
 const outsiderResult = createUser({ email: 'outsider@gurukul.dev', password: 'outsider123', name: 'Outsider' });
 const outsider = 'user' in outsiderResult ? outsiderResult.user : (() => { throw new Error('setup failed'); })();
 enrollUser(outsider.id, 'some-other-course');
-const outsiderCookie = `${SESSION_COOKIE}=${createSessionToken(outsider.id)}`;
+const outsiderCookie = `${SESSION_COOKIE}=${createSessionToken(toPublicUser(outsider), listEnrollments(outsider.id))}`;
 
 function pdfFile(name = 'doc.pdf'): File {
   const header = new TextEncoder().encode('%PDF-1.4\n');

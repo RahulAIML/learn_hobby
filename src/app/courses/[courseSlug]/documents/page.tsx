@@ -8,7 +8,6 @@ import { Footer } from '@/components/layout/Footer';
 import { CourseDocumentList } from '@/components/courses/CourseDocumentList';
 import { getCourse, courses } from '@/data/courses';
 import { SESSION_COOKIE, getSessionUserFromCookieValue } from '@/lib/auth/session';
-import { isEnrolled } from '@/lib/auth/store';
 
 interface Props {
   params: { courseSlug: string };
@@ -63,7 +62,7 @@ export default function CourseDocumentsPage({ params }: Props) {
         showLogin
       />
     );
-  } else if (user.role === 'student' && !isEnrolled(user.id, course.slug)) {
+  } else if (user.role === 'student' && !user.enrollments.includes(course.slug)) {
     gate = (
       <GateMessage
         icon={ShieldAlert}

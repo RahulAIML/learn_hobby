@@ -3,17 +3,18 @@ import { NextRequest } from 'next/server';
 import { POST as submitPOST, GET as historyGET } from '@/app/api/assessments/[assessmentId]/submissions/route';
 import { PUT as assessmentPUT } from '@/app/api/courses/[courseSlug]/modules/[moduleId]/assessment/route';
 import { POST as createModulePOST } from '@/app/api/courses/[courseSlug]/modules/route';
-import { getUserByEmail, createUser, enrollUser } from '@/lib/auth/store';
+import { getUserByEmail, createUser, listEnrollments } from '@/lib/auth/store';
 import { createSessionToken, SESSION_COOKIE } from '@/lib/auth/session';
+import { toPublicUser } from '@/lib/auth/types';
 
 const COURSE = 'data-science';
 
 const enrolledStudent = getUserByEmail('student@gurukul.dev')!;
-const enrolledCookie = `${SESSION_COOKIE}=${createSessionToken(enrolledStudent.id)}`;
+const enrolledCookie = `${SESSION_COOKIE}=${createSessionToken(toPublicUser(enrolledStudent), listEnrollments(enrolledStudent.id))}`;
 
 const outsiderResult = createUser({ email: `outsider-${Date.now()}@gurukul.dev`, password: 'outsider123', name: 'Outsider' });
 const outsider = 'user' in outsiderResult ? outsiderResult.user : (() => { throw new Error('setup failed'); })();
-const outsiderCookie = `${SESSION_COOKIE}=${createSessionToken(outsider.id)}`;
+const outsiderCookie = `${SESSION_COOKIE}=${createSessionToken(toPublicUser(outsider), listEnrollments(outsider.id))}`;
 
 async function makeAssessment(): Promise<string> {
   const modRes = await createModulePOST(

@@ -3,7 +3,6 @@ import { validateUploadedFile } from '@/lib/assessment/fileValidation.server';
 import { getDocument, replaceDocument, deleteDocument } from '@/lib/courseDocuments/store';
 import { toSummary } from '@/lib/courseDocuments/types';
 import { getSessionUser } from '@/lib/auth/session';
-import { isEnrolled } from '@/lib/auth/store';
 
 export const runtime = 'nodejs';
 
@@ -26,7 +25,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   if (!user) {
     return NextResponse.json({ success: false, error: { code: 'unauthenticated', message: 'Please sign in to view this document.' } }, { status: 401 });
   }
-  if (user.role === 'student' && !isEnrolled(user.id, params.courseSlug)) {
+  if (user.role === 'student' && !user.enrollments.includes(params.courseSlug)) {
     return NextResponse.json({ success: false, error: { code: 'forbidden', message: 'You are not enrolled in this course.' } }, { status: 403 });
   }
 
