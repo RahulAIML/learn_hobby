@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import type { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/courses/route';
 
-function jsonRequest(body: unknown): Request {
+function jsonRequest(body: unknown): NextRequest {
   return new Request('http://localhost/api/courses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }) as unknown as NextRequest;
 }
 
 describe('courses API routes', () => {

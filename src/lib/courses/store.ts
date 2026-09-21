@@ -41,3 +41,22 @@ export function createCourse(title: string): { course: Course } | { error: Creat
   courses.set(slug, course);
   return { course };
 }
+
+export type UpdateCourseError = 'invalid_title' | 'course_not_found';
+
+/** Renames a course. The slug (and therefore its URL/documents) stays the same — only the display title changes. */
+export function updateCourse(slug: string, title: string): { course: Course } | { error: UpdateCourseError } {
+  const existing = courses.get(slug);
+  if (!existing) return { error: 'course_not_found' };
+
+  const trimmed = title.trim();
+  if (!trimmed) return { error: 'invalid_title' };
+
+  const updated: Course = { ...existing, title: trimmed };
+  courses.set(slug, updated);
+  return { course: updated };
+}
+
+export function deleteCourse(slug: string): boolean {
+  return courses.delete(slug);
+}

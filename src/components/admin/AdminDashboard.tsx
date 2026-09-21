@@ -1,8 +1,21 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, FileText, ShieldAlert, ArrowRight, Plus, Loader2, AlertCircle, BookOpen } from 'lucide-react';
+import {
+  LayoutDashboard,
+  FileText,
+  ShieldAlert,
+  ArrowRight,
+  Plus,
+  Loader2,
+  AlertCircle,
+  BookOpen,
+  Pencil,
+  Trash2,
+  Check,
+  X,
+} from 'lucide-react';
 import type { Course, CourseDocumentSummary } from '@/lib/courseDocuments/types';
 
 interface CourseWithStats extends Course {
@@ -15,6 +28,10 @@ export const AdminDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [editingSlug, setEditingSlug] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [busySlug, setBusySlug] = useState<string | null>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   const loadCourses = useCallback(async () => {
     setLoading(true);
@@ -68,6 +85,56 @@ export const AdminDashboard: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to create course.');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const startEditing = (course: CourseWithStats) => {
+    setEditingSlug(course.slug);
+    setEditTitle(course.title);
+    setError(null);
+    setTimeout(() => editInputRef.current?.focus(), 0);
+  };
+
+  const cancelEditing = () => {
+    setEditingSlug(null);
+    setEditTitle('');
+  };
+
+  const handleRename = async (slug: string) => {
+    if (!editTitle.trim()) return;
+    setBusySlug(slug);
+    setError(null);
+    try {
+      const res = await fetch(`/api/courses/${slug}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: editTitle.trim() }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.success) throw new Error(body?.error?.message ?? 'Failed to rename course.');
+      setEditingSlug(null);
+      setEditTitle('');
+      await loadCourses();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to rename course.');
+    } finally {
+      setBusySlug(null);
+    }
+  };
+
+  const handleDeleteCourse = async (slug: string, title: string) => {
+    if (!window.confirm(`Delete "${title}" and all of its documents? This cannot be undone.`)) return;
+    setBusySlug(slug);
+    setError(null);
+    try {
+      const res = await fetch(`/api/courses/${slug}`, { method: 'DELETE' });
+      const body = await res.json();
+      if (!res.ok || !body.success) throw new Error(body?.error?.message ?? 'Failed to delete course.');
+      await loadCourses();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete course.');
+    } finally {
+      setBusySlug(null);
     }
   };
 
@@ -157,27 +224,88 @@ export const AdminDashboard: React.FC = () => {
         </div>
       ) : (
         <ul className="space-y-3">
-          {courses.map((course) => (
-            <li key={course.slug}>
-              <Link
-                href={`/admin/courses/${course.slug}/documents`}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 hover:border-red-300 transition-colors group"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-5 h-5 text-red-600" />
+          {courses.map((course) => {
+            const isEditing = editingSlug === course.slug;
+            const isBusy = busySlug === course.slug;
+            return (
+              <li key={course.slug} className="rounded-2xl border border-slate-200 bg-white p-4">
+                {isEditing ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={editInputRef}
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleRename(course.slug);
+                        if (e.key === 'Escape') cancelEditing();
+                      }}
+                      disabled={isBusy}
+                      className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-600/30 focus:border-red-400 transition-colors disabled:opacity-60"
+                    />
+                    <button
+                      type="button"
+                      disabled={isBusy || !editTitle.trim()}
+                      onClick={() => handleRename(course.slug)}
+                      aria-label="Save"
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50 flex-shrink-0"
+                    >
+                      {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={cancelEditing}
+                      aria-label="Cancel"
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-full text-slate-500 border border-slate-200 hover:border-slate-300 transition-colors disabled:opacity-50 flex-shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate">{course.title}</p>
-                    <p className="text-xs text-slate-500">
-                      {course.documentCount === null ? 'Manage documents' : `${course.documentCount} document${course.documentCount === 1 ? '' : 's'}`}
-                    </p>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <Link
+                      href={`/admin/courses/${course.slug}/documents`}
+                      className="flex items-center gap-3 min-w-0 flex-1 group"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center flex-shrink-0">
+                        <FileText className="w-5 h-5 text-red-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate">{course.title}</p>
+                        <p className="text-xs text-slate-500">
+                          {course.documentCount === null
+                            ? 'Manage documents'
+                            : `${course.documentCount} document${course.documentCount === 1 ? '' : 's'}`}
+                        </p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-red-600 transition-colors flex-shrink-0 ml-auto" />
+                    </Link>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => startEditing(course)}
+                        aria-label={`Rename ${course.title}`}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-full text-slate-500 border border-slate-200 hover:border-red-300 hover:text-red-700 transition-colors disabled:opacity-50"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => handleDeleteCourse(course.slug, course.title)}
+                        aria-label={`Delete ${course.title}`}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-full text-red-700 border border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-red-600 transition-colors flex-shrink-0" />
-              </Link>
-            </li>
-          ))}
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

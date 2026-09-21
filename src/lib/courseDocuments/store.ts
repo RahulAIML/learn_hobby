@@ -95,3 +95,8 @@ export function deleteDocument(courseSlug: string, id: string): boolean {
   documentsByCourse.set(courseSlug, next);
   return removed;
 }
+
+/** Deletes every document belonging to a course — used when the course itself is deleted. */
+export function deleteAllDocuments(courseSlug: string): void {
+  documentsByCourse.delete(courseSlug);
+}
