@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FileText, Upload, Trash2, RefreshCw, Loader2, AlertCircle, ShieldAlert } from 'lucide-react';
+import Link from 'next/link';
+import { FileText, Upload, Trash2, RefreshCw, Loader2, AlertCircle, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { formatBytes } from '@/lib/assessment/fileValidation';
 import type { CourseDocumentSummary } from '@/lib/courseDocuments/types';
 
@@ -97,6 +98,14 @@ export const CourseDocumentAdmin: React.FC<CourseDocumentAdminProps> = ({ course
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+      <Link
+        href="/admin"
+        className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-red-600 transition-colors mb-4"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+        Back to Dashboard
+      </Link>
+
       <div className="mb-6">
         <span className="text-xs font-extrabold text-red-600 uppercase tracking-wider">{courseTitle}</span>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-950 font-heading tracking-tight mt-1.5">

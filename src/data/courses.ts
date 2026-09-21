@@ -1,14 +1,8 @@
-import type { Course } from '@/lib/courseDocuments/types';
+import { listCourses, getCourse as getCourseFromStore } from '@/lib/courses/store';
 
-/**
- * Static course list. No course-management backend exists yet — this is
- * the seed list documents can be attached to. Swapping this for a real
- * fetch later does not change any consumer of getCourse()/courses.
- */
-export const courses: Course[] = [
-  { slug: 'data-science', title: 'Data Science Championship Program™' },
-];
+/** Seed list for static param generation at build time. New courses created at runtime are still resolved via getCourse() — see src/lib/courses/store.ts. */
+export const courses = listCourses();
 
-export function getCourse(slug: string): Course | undefined {
-  return courses.find((c) => c.slug === slug);
+export function getCourse(slug: string) {
+  return getCourseFromStore(slug);
 }
