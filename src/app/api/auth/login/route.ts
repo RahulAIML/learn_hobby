@@ -25,12 +25,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: { code: 'invalid_request', message: 'Email and password are required.' } }, { status: 400 });
   }
 
-  const user = getUserByEmail(parsed.data.email);
+  const user = await getUserByEmail(parsed.data.email);
   if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) {
     return NextResponse.json({ success: false, error: { code: 'invalid_credentials', message: 'Incorrect email or password.' } }, { status: 401 });
   }
 
-  const token = createSessionToken(toPublicUser(user), listEnrollments(user.id));
+  const token = createSessionToken(toPublicUser(user), await listEnrollments(user.id));
   const res = NextResponse.json({ success: true, user: toPublicUser(user) });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
   return res;

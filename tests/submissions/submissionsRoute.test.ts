@@ -1,20 +1,37 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST as submitPOST, GET as historyGET } from '@/app/api/assessments/[assessmentId]/submissions/route';
 import { PUT as assessmentPUT } from '@/app/api/courses/[courseSlug]/modules/[moduleId]/assessment/route';
 import { POST as createModulePOST } from '@/app/api/courses/[courseSlug]/modules/route';
-import { getUserByEmail, createUser, listEnrollments } from '@/lib/auth/store';
+import { createUser, enrollUser, listEnrollments } from '@/lib/auth/store';
 import { createSessionToken, SESSION_COOKIE } from '@/lib/auth/session';
 import { toPublicUser } from '@/lib/auth/types';
 
 const COURSE = 'data-science';
 
-const enrolledStudent = getUserByEmail('student@gurukul.dev')!;
-const enrolledCookie = `${SESSION_COOKIE}=${createSessionToken(toPublicUser(enrolledStudent), listEnrollments(enrolledStudent.id))}`;
+let enrolledCookie: string;
+let outsiderCookie: string;
 
-const outsiderResult = createUser({ email: `outsider-${Date.now()}@gurukul.dev`, password: 'outsider123', name: 'Outsider' });
-const outsider = 'user' in outsiderResult ? outsiderResult.user : (() => { throw new Error('setup failed'); })();
-const outsiderCookie = `${SESSION_COOKIE}=${createSessionToken(toPublicUser(outsider), listEnrollments(outsider.id))}`;
+beforeAll(async () => {
+  const enrolledResult = await createUser({
+    username: `submtest_${Date.now()}`,
+    email: `submtest-${Date.now()}@gurukul.dev`,
+    password: 'student123',
+    name: 'Submission Test Student',
+  });
+  if (!('user' in enrolledResult)) throw new Error('setup failed');
+  await enrollUser(enrolledResult.user.id, COURSE);
+  enrolledCookie = `${SESSION_COOKIE}=${createSessionToken(toPublicUser(enrolledResult.user), await listEnrollments(enrolledResult.user.id))}`;
+
+  const outsiderResult = await createUser({
+    username: `submoutsider_${Date.now()}`,
+    email: `submoutsider-${Date.now()}@gurukul.dev`,
+    password: 'outsider123',
+    name: 'Outsider',
+  });
+  if (!('user' in outsiderResult)) throw new Error('setup failed');
+  outsiderCookie = `${SESSION_COOKIE}=${createSessionToken(toPublicUser(outsiderResult.user), await listEnrollments(outsiderResult.user.id))}`;
+});
 
 async function makeAssessment(): Promise<string> {
   const modRes = await createModulePOST(
@@ -122,7 +139,7 @@ describe('assessment submissions API', () => {
       expect(historyBody.submissions.length).toBeGreaterThan(0);
       expect(historyBody.submissions[0].evaluation).toBeTruthy();
     },
-    30000
+    45000
   );
 
   it('mock-mode evaluation still returns a structured, schema-valid result', async () => {

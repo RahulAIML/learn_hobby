@@ -1,0 +1,23 @@
+# Local development Postgres — NOT used in production. Production and
+# staging use Render Postgres via DATABASE_URL (see .env.example).
+#
+# Usage:
+#   docker compose up -d
+#   DATABASE_URL=postgresql://gurukul:gurukul@localhost:5432/gurukul npm run db:migrate
+#   DATABASE_URL=postgresql://gurukul:gurukul@localhost:5432/gurukul npm run db:seed
+#   DATABASE_URL=postgresql://gurukul:gurukul@localhost:5432/gurukul npm run dev
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gurukul
+      POSTGRES_PASSWORD: gurukul
+      POSTGRES_DB: gurukul
+    ports:
+      - '5432:5432'
+    volumes:
+      - gurukul_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  gurukul_postgres_data:

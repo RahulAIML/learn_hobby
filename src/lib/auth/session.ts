@@ -7,6 +7,7 @@ const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 interface SessionPayload {
   sub: string; // userId
+  username: string;
   email: string;
   name: string;
   role: SessionUser['role'];
@@ -24,13 +25,21 @@ function getSecret(): string {
 /**
  * The session is self-contained: role and enrollments are embedded in the
  * signed JWT at login time, not re-resolved from the DB on every request.
- * This matters because on Vercel each serverless instance has its own
- * ephemeral /tmp SQLite file (src/lib/db/sqlite.ts) — a DB lookup here
- * would resolve inconsistently depending on which instance handles the
- * request. The JWT signature is the source of truth instead.
+ * This keeps session validation independent of database round-trips and
+ * consistent regardless of which serverless instance handles a request —
+ * the JWT signature is the source of truth. The underlying store is now
+ * Postgres (src/lib/db/client.ts, src/lib/auth/store.ts), consulted only
+ * at login time to build the token.
  */
 export function createSessionToken(user: PublicUser, enrollments: string[]): string {
-  const payload: SessionPayload = { sub: user.id, email: user.email, name: user.name, role: user.role, enrollments };
+  const payload: SessionPayload = {
+    sub: user.id,
+    username: user.username,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    enrollments,
+  };
   return jwt.sign(payload, getSecret(), { expiresIn: SESSION_MAX_AGE_SECONDS });
 }
 
@@ -40,6 +49,7 @@ function decodeSessionToken(token: string): SessionUser | null {
     if (!decoded.sub) return null;
     return {
       id: decoded.sub,
+      username: decoded.username,
       email: decoded.email,
       name: decoded.name,
       role: decoded.role,

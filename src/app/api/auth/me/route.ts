@@ -10,6 +10,6 @@ export async function GET(req: NextRequest) {
   }
   return NextResponse.json({
     success: true,
-    user: { id: user.id, email: user.email, name: user.name, role: user.role, enrollments: user.enrollments },
+    user: { id: user.id, username: user.username, email: user.email, name: user.name, role: user.role, enrollments: user.enrollments },
   });
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET as listGET, POST as listPOST } from '@/app/api/courses/[courseSlug]/documents/route';
 import {
@@ -7,19 +7,36 @@ import {
   DELETE as docDELETE,
 } from '@/app/api/courses/[courseSlug]/documents/[docId]/route';
 import { listDocuments, deleteDocument } from '@/lib/courseDocuments/store';
-import { getUserByEmail, createUser, enrollUser, listEnrollments } from '@/lib/auth/store';
+import { createUser, enrollUser, listEnrollments } from '@/lib/auth/store';
 import { createSessionToken, SESSION_COOKIE } from '@/lib/auth/session';
 import { toPublicUser } from '@/lib/auth/types';
 
 const COURSE = 'data-science';
 
-const enrolledStudent = getUserByEmail('student@gurukul.dev')!;
-const enrolledCookie = `${SESSION_COOKIE}=${createSessionToken(toPublicUser(enrolledStudent), listEnrollments(enrolledStudent.id))}`;
+let enrolledCookie: string;
+let outsiderCookie: string;
 
-const outsiderResult = createUser({ email: 'outsider@gurukul.dev', password: 'outsider123', name: 'Outsider' });
-const outsider = 'user' in outsiderResult ? outsiderResult.user : (() => { throw new Error('setup failed'); })();
-enrollUser(outsider.id, 'some-other-course');
-const outsiderCookie = `${SESSION_COOKIE}=${createSessionToken(toPublicUser(outsider), listEnrollments(outsider.id))}`;
+beforeAll(async () => {
+  const enrolledResult = await createUser({
+    username: `enrolled_${Date.now()}`,
+    email: `enrolled-${Date.now()}@gurukul.dev`,
+    password: 'student123',
+    name: 'Enrolled Student',
+  });
+  if (!('user' in enrolledResult)) throw new Error('setup failed');
+  await enrollUser(enrolledResult.user.id, COURSE);
+  enrolledCookie = `${SESSION_COOKIE}=${createSessionToken(toPublicUser(enrolledResult.user), await listEnrollments(enrolledResult.user.id))}`;
+
+  const outsiderResult = await createUser({
+    username: `outsider_${Date.now()}`,
+    email: `outsider-${Date.now()}@gurukul.dev`,
+    password: 'outsider123',
+    name: 'Outsider',
+  });
+  if (!('user' in outsiderResult)) throw new Error('setup failed');
+  await enrollUser(outsiderResult.user.id, 'some-other-course');
+  outsiderCookie = `${SESSION_COOKIE}=${createSessionToken(toPublicUser(outsiderResult.user), await listEnrollments(outsiderResult.user.id))}`;
+});
 
 function pdfFile(name = 'doc.pdf'): File {
   const header = new TextEncoder().encode('%PDF-1.4\n');
