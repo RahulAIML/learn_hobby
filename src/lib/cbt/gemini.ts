@@ -49,24 +49,21 @@ export async function generateCbtQuestions(input: CbtAssessmentInput): Promise<C
   const text = payload.candidates?.[0]?.content?.parts?.find((part) => part.text)?.text;
   if (!text) throw new CbtGenerationError('Gemini returned no questions.');
   let parsed: unknown; try { parsed = JSON.parse(text); } catch { throw new CbtGenerationError('Gemini returned invalid JSON.'); }
-  // Gemini sometimes omits `correctAnswer` for fill_blank questions and only returns `acceptableAnswers`.
+  // Gemini sometimes omits `correctAnswer` for fill_blank questions and only returns `acceptableAnswers`,
+  // and sometimes attaches a stray empty/short `options` array to fill_blank questions (which our schema
+  // requires >=2 items for if present at all). Normalize both before validation.
   if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { questions?: unknown }).questions)) {
     for (const q of (parsed as { questions: Record<string, unknown>[] }).questions) {
-      if (q.type === 'fill_blank' && !q.correctAnswer && Array.isArray(q.acceptableAnswers) && q.acceptableAnswers.length > 0) {
-        q.correctAnswer = q.acceptableAnswers[0];
+      if (q.type === 'fill_blank') {
+        if (!q.correctAnswer && Array.isArray(q.acceptableAnswers) && q.acceptableAnswers.length > 0) {
+          q.correctAnswer = q.acceptableAnswers[0];
+        }
+        delete q.options;
       }
     }
   }
   const result = generatedSetSchema.safeParse(parsed);
-  if (!result.success || result.data.questions.length !== total) {
-    console.error('[cbt-generate] validation failed', {
-      issues: result.success ? null : result.error.issues,
-      questionCount: result.success ? result.data.questions.length : (parsed as { questions?: unknown[] })?.questions?.length,
-      expectedTotal: total,
-      rawText: text.slice(0, 4000),
-    });
-    throw new CbtGenerationError('Gemini did not return the requested number of valid questions.');
-  }
+  if (!result.success || result.data.questions.length !== total) throw new CbtGenerationError('Gemini did not return the requested number of valid questions.');
   const mcqs = result.data.questions.filter((question) => question.type === 'mcq');
   const fills = result.data.questions.filter((question) => question.type === 'fill_blank');
   if (mcqs.length !== input.mcqCount || fills.length !== input.fillBlankCount || mcqs.some((question) => question.options?.length !== input.optionsPerMcq)) throw new CbtGenerationError('Gemini did not satisfy the requested question configuration.');
