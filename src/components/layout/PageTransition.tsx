@@ -8,13 +8,17 @@ export const PageTransition: React.FC<{ children: React.ReactNode }> = ({ childr
   const pathname = usePathname();
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    // popLayout (not "wait"): the outgoing page is pulled out of document
+    // flow immediately instead of the container collapsing to zero height
+    // until it fully unmounts — that collapse-then-snap-back is what read
+    // as a "shake" on navigation.
+    <AnimatePresence mode="popLayout" initial={false}>
       <motion.div
         key={pathname}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.12, ease: 'easeOut' }}
+        transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
       >
         {children}
       </motion.div>
