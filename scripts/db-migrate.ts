@@ -1,6 +1,7 @@
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { resolveSslOption } from '../src/lib/db/connectionOptions';
 
 /**
  * Applies pending Drizzle migrations from ./drizzle to DATABASE_URL.
@@ -14,7 +15,7 @@ async function main() {
     process.exit(1);
   }
 
-  const client = postgres(connectionString, { max: 1 });
+  const client = postgres(connectionString, { max: 1, ssl: resolveSslOption(connectionString) });
   const db = drizzle(client);
 
   console.log('Applying migrations...');

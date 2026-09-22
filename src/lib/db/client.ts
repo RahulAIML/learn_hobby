@@ -1,6 +1,7 @@
 import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
+import { resolveSslOption } from './connectionOptions';
 
 /**
  * Postgres connection (Render Postgres in prod/dev, DATABASE_URL-driven).
@@ -25,7 +26,7 @@ function createProductionConnection(): DrizzleDb {
   if (!connectionString) {
     throw new Error('DATABASE_URL is not configured.');
   }
-  const client = postgres(connectionString, { max: 10 });
+  const client = postgres(connectionString, { max: 10, ssl: resolveSslOption(connectionString) });
   return drizzlePostgres(client, { schema });
 }
 

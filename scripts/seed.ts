@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import { eq } from 'drizzle-orm';
 import { users, enrollments } from '../src/lib/db/schema';
 import { hashPassword } from '../src/lib/auth/password';
+import { resolveSslOption } from '../src/lib/db/connectionOptions';
 
 /**
  * Development seed data — inserted INTO Postgres, never hardcoded as the
@@ -18,7 +19,7 @@ async function main() {
     process.exit(1);
   }
 
-  const client = postgres(connectionString, { max: 1 });
+  const client = postgres(connectionString, { max: 1, ssl: resolveSslOption(connectionString) });
   const db = drizzle(client);
 
   const existing = await db.select().from(users).where(eq(users.email, 'student@gurukul.dev')).limit(1);

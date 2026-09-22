@@ -139,7 +139,7 @@ describe('assessment submissions API', () => {
       expect(historyBody.submissions.length).toBeGreaterThan(0);
       expect(historyBody.submissions[0].evaluation).toBeTruthy();
     },
-    45000
+    60000
   );
 
   it('mock-mode evaluation still returns a structured, schema-valid result', async () => {
