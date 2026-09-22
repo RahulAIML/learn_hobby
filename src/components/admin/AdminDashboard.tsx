@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   LayoutDashboard,
   FileText,
-  ShieldAlert,
   ArrowRight,
   Plus,
   Loader2,
@@ -152,15 +151,6 @@ export const AdminDashboard: React.FC = () => {
       <p className="text-sm text-slate-500 mt-2">
         Manage courses and their documents — create courses, then upload, replace, or delete materials for each one.
       </p>
-
-      <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 mt-6 mb-8">
-        <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-900 leading-relaxed">
-          <strong>This dashboard is not access-controlled.</strong> No authentication system exists in this project
-          yet, so anyone with the link can reach it. Add a real admin-role check here once auth is built. Courses
-          and documents are also stored in server memory only — they will be lost on redeploy or a cold start.
-        </p>
-      </div>
 
       <div className="grid grid-cols-2 gap-3 mb-8">
         <div className="rounded-2xl border border-slate-200 bg-white p-4">

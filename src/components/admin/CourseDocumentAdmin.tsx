@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { FileText, Upload, Trash2, RefreshCw, Loader2, AlertCircle, ShieldAlert, ArrowLeft, Plus, BookOpen, ClipboardList, Save } from 'lucide-react';
+import { FileText, Upload, Trash2, RefreshCw, Loader2, AlertCircle, ArrowLeft, Plus, BookOpen, ClipboardList, Save } from 'lucide-react';
 import { formatBytes } from '@/lib/assessment/fileValidation';
 import type { CourseDocumentSummary } from '@/lib/courseDocuments/types';
 import type { Module } from '@/lib/modules/types';
@@ -152,16 +152,6 @@ export const CourseDocumentAdmin: React.FC<CourseDocumentAdminProps> = ({ course
         <h1 className="text-2xl sm:text-3xl font-black text-slate-950 font-heading tracking-tight mt-1.5">
           Manage Course Documents
         </h1>
-      </div>
-
-      <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 mb-8">
-        <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-900 leading-relaxed">
-          <strong>This page is not access-controlled.</strong> No authentication system exists in this project yet,
-          so anyone with the link can reach it. Add a real admin-role check here once auth is built. Documents are
-          also stored in server memory only — they will be lost on redeploy or a cold start, not written to a
-          database yet.
-        </p>
       </div>
 
       {error && (
