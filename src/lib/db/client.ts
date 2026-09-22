@@ -124,6 +124,27 @@ async function createTestConnection(): Promise<DrizzleDb> {
       evaluation jsonb
     )
   `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS cbt_assessments (
+      id uuid PRIMARY KEY, course_slug varchar(100) NOT NULL REFERENCES courses(slug) ON DELETE CASCADE,
+      module_id uuid NOT NULL REFERENCES modules(id) ON DELETE CASCADE, title varchar(300) NOT NULL,
+      topic varchar(300) NOT NULL, description text NOT NULL, difficulty varchar(20) NOT NULL,
+      time_limit_minutes integer NOT NULL, mcq_count integer NOT NULL, fill_blank_count integer NOT NULL,
+      options_per_mcq integer NOT NULL, status varchar(20) NOT NULL DEFAULT 'draft',
+      created_by uuid NOT NULL REFERENCES users(id), created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS cbt_questions (
+      id uuid PRIMARY KEY, assessment_id uuid NOT NULL REFERENCES cbt_assessments(id) ON DELETE CASCADE,
+      type varchar(20) NOT NULL, question_text text NOT NULL, correct_answer text NOT NULL, acceptable_answers jsonb,
+      explanation text NOT NULL, difficulty varchar(20) NOT NULL, topic varchar(300) NOT NULL, order_index integer NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS cbt_question_options (id uuid PRIMARY KEY, question_id uuid NOT NULL REFERENCES cbt_questions(id) ON DELETE CASCADE, option_text text NOT NULL, order_index integer NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS cbt_attempts (id uuid PRIMARY KEY, assessment_id uuid NOT NULL REFERENCES cbt_assessments(id) ON DELETE CASCADE, student_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, started_at timestamptz NOT NULL DEFAULT now(), submitted_at timestamptz, status varchar(20) NOT NULL DEFAULT 'in_progress', score integer, max_score integer, percentage integer, time_taken_seconds integer, created_at timestamptz NOT NULL DEFAULT now())`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS cbt_answers (id uuid PRIMARY KEY, attempt_id uuid NOT NULL REFERENCES cbt_attempts(id) ON DELETE CASCADE, question_id uuid NOT NULL REFERENCES cbt_questions(id) ON DELETE CASCADE, answer text, marked_for_review integer NOT NULL DEFAULT 0, is_correct integer, marks_awarded integer, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`);
 
   return db;
 }

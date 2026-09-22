@@ -136,3 +136,73 @@ export const submissions = pgTable('submissions', {
   // it's always read/written together with its submission, never independently.
   evaluation: jsonb('evaluation'),
 });
+
+// CBT assessments deliberately use their own tables.  The existing
+// `assessments`/`submissions` pair is the document-upload evaluation product;
+// combining the two would expose incompatible lifecycle and scoring rules.
+export const cbtAssessments = pgTable('cbt_assessments', {
+  id: uuid('id').primaryKey(),
+  courseSlug: varchar('course_slug', { length: 100 }).notNull().references(() => courses.slug, { onDelete: 'cascade' }),
+  moduleId: uuid('module_id').notNull().references(() => modules.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 300 }).notNull(),
+  topic: varchar('topic', { length: 300 }).notNull(),
+  description: text('description').notNull(),
+  difficulty: varchar('difficulty', { length: 20 }).notNull(),
+  timeLimitMinutes: integer('time_limit_minutes').notNull(),
+  mcqCount: integer('mcq_count').notNull(),
+  fillBlankCount: integer('fill_blank_count').notNull(),
+  optionsPerMcq: integer('options_per_mcq').notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('draft'),
+  createdBy: uuid('created_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const cbtQuestions = pgTable('cbt_questions', {
+  id: uuid('id').primaryKey(),
+  assessmentId: uuid('assessment_id').notNull().references(() => cbtAssessments.id, { onDelete: 'cascade' }),
+  type: varchar('type', { length: 20 }).notNull(),
+  questionText: text('question_text').notNull(),
+  correctAnswer: text('correct_answer').notNull(),
+  acceptableAnswers: jsonb('acceptable_answers').$type<string[]>(),
+  explanation: text('explanation').notNull(),
+  difficulty: varchar('difficulty', { length: 20 }).notNull(),
+  topic: varchar('topic', { length: 300 }).notNull(),
+  orderIndex: integer('order_index').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const cbtQuestionOptions = pgTable('cbt_question_options', {
+  id: uuid('id').primaryKey(),
+  questionId: uuid('question_id').notNull().references(() => cbtQuestions.id, { onDelete: 'cascade' }),
+  optionText: text('option_text').notNull(),
+  orderIndex: integer('order_index').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const cbtAttempts = pgTable('cbt_attempts', {
+  id: uuid('id').primaryKey(),
+  assessmentId: uuid('assessment_id').notNull().references(() => cbtAssessments.id, { onDelete: 'cascade' }),
+  studentId: uuid('student_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  status: varchar('status', { length: 20 }).notNull().default('in_progress'),
+  score: integer('score'),
+  maxScore: integer('max_score'),
+  percentage: integer('percentage'),
+  timeTakenSeconds: integer('time_taken_seconds'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const cbtAnswers = pgTable('cbt_answers', {
+  id: uuid('id').primaryKey(),
+  attemptId: uuid('attempt_id').notNull().references(() => cbtAttempts.id, { onDelete: 'cascade' }),
+  questionId: uuid('question_id').notNull().references(() => cbtQuestions.id, { onDelete: 'cascade' }),
+  answer: text('answer'),
+  markedForReview: integer('marked_for_review').notNull().default(0),
+  isCorrect: integer('is_correct'),
+  marksAwarded: integer('marks_awarded'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

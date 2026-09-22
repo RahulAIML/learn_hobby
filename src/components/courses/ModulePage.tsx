@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { FileText, Download, Eye, Loader2, AlertCircle, ArrowRight, ClipboardList } from 'lucide-react';
+import { FileText, Download, Eye, Loader2, AlertCircle, ArrowRight, ClipboardList, Timer } from 'lucide-react';
 import { formatBytes } from '@/lib/assessment/fileValidation';
 import type { CourseDocumentSummary } from '@/lib/courseDocuments/types';
 
@@ -11,6 +11,8 @@ interface ModulePageProps {
   moduleId: string;
   moduleTitle: string;
   assessmentId: string | null;
+  cbtAssessmentId?: string | null;
+  cbtAssessmentTitle?: string | null;
 }
 
 type ListState =
@@ -18,7 +20,14 @@ type ListState =
   | { status: 'error'; message: string }
   | { status: 'loaded'; documents: CourseDocumentSummary[] };
 
-export const ModulePage: React.FC<ModulePageProps> = ({ courseSlug, moduleId, moduleTitle, assessmentId }) => {
+export const ModulePage: React.FC<ModulePageProps> = ({
+  courseSlug,
+  moduleId,
+  moduleTitle,
+  assessmentId,
+  cbtAssessmentId,
+  cbtAssessmentTitle,
+}) => {
   const [state, setState] = useState<ListState>({ status: 'loading' });
 
   useEffect(() => {
@@ -115,8 +124,25 @@ export const ModulePage: React.FC<ModulePageProps> = ({ courseSlug, moduleId, mo
         </ul>
       )}
 
+      {cbtAssessmentId && (
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-5 sm:p-6">
+          <div>
+            <p className="text-sm font-bold text-white">{cbtAssessmentTitle ?? 'Timed CBT Assessment available'}</p>
+            <p className="text-xs text-slate-300 mt-0.5">Computer-based test with a live timer and instant scoring.</p>
+          </div>
+          <Link
+            href={`/cbt/${cbtAssessmentId}`}
+            className="flex-shrink-0 w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full text-sm font-bold text-slate-950 bg-white hover:bg-slate-100 shadow-lg transition-all duration-200"
+          >
+            <Timer className="w-4 h-4" />
+            <span>Start CBT Assessment</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
+
       {assessmentId && (
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-red-100 bg-red-50/50 p-5 sm:p-6">
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-red-100 bg-red-50/50 p-5 sm:p-6">
           <div>
             <p className="text-sm font-bold text-slate-900">Ready to check your understanding?</p>
             <p className="text-xs text-slate-600 mt-0.5">Complete the module assessment and get instant AI feedback.</p>

@@ -9,6 +9,7 @@ import { ModulePage } from '@/components/courses/ModulePage';
 import { getCourse } from '@/data/courses';
 import { getModule } from '@/lib/modules/store';
 import { getAssessmentByModule } from '@/lib/assessments/store';
+import { getPublishedCbtAssessmentByModule } from '@/lib/cbt/store';
 import { SESSION_COOKIE, getSessionUserFromCookieValue } from '@/lib/auth/session';
 
 interface Props {
@@ -58,6 +59,7 @@ export default async function CourseModulePage({ params }: Props) {
   }
 
   const assessment = await getAssessmentByModule(mod.id);
+  const cbtAssessment = await getPublishedCbtAssessmentByModule(mod.id);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -69,6 +71,8 @@ export default async function CourseModulePage({ params }: Props) {
             moduleId={mod.id}
             moduleTitle={mod.title}
             assessmentId={assessment && assessment.status === 'active' ? assessment.id : null}
+            cbtAssessmentId={cbtAssessment ? cbtAssessment.id : null}
+            cbtAssessmentTitle={cbtAssessment ? cbtAssessment.title : null}
           />
         )}
       </main>

@@ -29,6 +29,13 @@
       "when": 1790101786772,
       "tag": "0003_dry_sasquatch",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790200000000,
+      "tag": "0004_cbt_assessment_system",
+      "breakpoints": true
     }
   ]
 }

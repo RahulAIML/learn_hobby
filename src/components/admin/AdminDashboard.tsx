@@ -146,9 +146,14 @@ export const AdminDashboard: React.FC = () => {
           <LayoutDashboard className="w-4 h-4 text-red-600" />
           <span className="text-xs font-extrabold text-red-600 uppercase tracking-wider">Admin</span>
         </div>
-        <Link href="/admin/users" className="text-xs font-bold text-slate-500 hover:text-red-700 transition-colors">
-          Registered Users →
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/admin/cbt" className="text-xs font-bold text-slate-500 hover:text-red-700 transition-colors">
+            CBT Assessments →
+          </Link>
+          <Link href="/admin/users" className="text-xs font-bold text-slate-500 hover:text-red-700 transition-colors">
+            Registered Users →
+          </Link>
+        </div>
       </div>
       <h1 className="text-2xl sm:text-3xl font-black text-slate-950 font-heading tracking-tight">
         Admin Dashboard
