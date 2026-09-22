@@ -6,7 +6,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 
 export const LoginForm: React.FC = () => {
   const router = useRouter();
-  const [email, setEmail] = useState('student@gurukul.dev');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,9 +82,6 @@ export const LoginForm: React.FC = () => {
         {loading && <Loader2 className="w-4 h-4 animate-spin" />}
         Sign In
       </button>
-      <p className="text-center text-xs text-slate-400">
-        Demo student account: student@gurukul.dev / student123
-      </p>
     </form>
   );
 };
