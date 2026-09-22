@@ -141,9 +141,14 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-      <div className="flex items-center gap-2 mb-1.5">
-        <LayoutDashboard className="w-4 h-4 text-red-600" />
-        <span className="text-xs font-extrabold text-red-600 uppercase tracking-wider">Admin</span>
+      <div className="flex items-center justify-between gap-3 mb-1.5">
+        <div className="flex items-center gap-2">
+          <LayoutDashboard className="w-4 h-4 text-red-600" />
+          <span className="text-xs font-extrabold text-red-600 uppercase tracking-wider">Admin</span>
+        </div>
+        <Link href="/admin/users" className="text-xs font-bold text-slate-500 hover:text-red-700 transition-colors">
+          Registered Users →
+        </Link>
       </div>
       <h1 className="text-2xl sm:text-3xl font-black text-slate-950 font-heading tracking-tight">
         Admin Dashboard

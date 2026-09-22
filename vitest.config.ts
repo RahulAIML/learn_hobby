@@ -24,7 +24,11 @@ export default defineConfig({
     // running too many concurrently strains I/O on Windows and causes
     // spurious failures unrelated to test correctness.
     poolOptions: {
-      threads: { maxThreads: 4, minThreads: 1 },
+      // PGlite includes a Postgres WASM runtime per worker.  On Windows,
+      // even two concurrent integration workers can exhaust Node's heap
+      // before Vitest gets to report a test result.  Keep this suite truly
+      // serial; each file provisions its own database state anyway.
+      threads: { maxThreads: 1, minThreads: 1 },
     },
     env: {
       ...loadDotEnvLocal(),

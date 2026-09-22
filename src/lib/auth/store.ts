@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { users, enrollments } from '@/lib/db/schema';
 import { isUuid } from '@/lib/db/isUuid';
@@ -22,8 +22,25 @@ function rowToUser(row: typeof users.$inferSelect): User {
     mobile: row.mobile,
     phoneNo: row.phoneNo,
     role: row.role as UserRole,
+    lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/** Admin visibility: every registered user, most recently created first. Never includes passwordHash. */
+export async function listUsers(): Promise<Omit<User, 'passwordHash'>[]> {
+  const db = await getDb();
+  const rows = await db.select().from(users).orderBy(desc(users.createdAt));
+  return rows.map((row) => {
+    const { passwordHash: _passwordHash, ...rest } = rowToUser(row);
+    return rest;
+  });
+}
+
+/** Records that a user just signed in — surfaced to admins via listUsers(). */
+export async function recordLogin(id: string): Promise<void> {
+  const db = await getDb();
+  await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, id));
 }
 
 export async function getUserById(id: string): Promise<User | undefined> {

@@ -24,6 +24,7 @@ export const users = pgTable('users', {
   phoneNo: varchar('phone_no', { length: 20 }),
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
   role: varchar('role', { length: 20 }).notNull().default('student'),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -45,6 +46,29 @@ export const enrollments = pgTable(
 export const courses = pgTable('courses', {
   slug: varchar('slug', { length: 100 }).primaryKey(),
   title: varchar('title', { length: 300 }).notNull(),
+});
+
+/**
+ * Membership/tier tracking, kept as its own table per your instruction to
+ * separate paid users from the main users table. LIMITATION (disclosed
+ * honestly, same pattern as every other placeholder in this project): no
+ * payment gateway is integrated. There is no real transaction processing,
+ * no card handling, no Razorpay/Stripe call here — `activatedBy` and
+ * `notes` exist so an admin can manually record a payment taken outside
+ * the app (bank transfer, in person, etc.) until a real gateway is wired
+ * in. Do not treat rows here as proof of an actual charge having occurred.
+ */
+export const paidUsers = pgTable('paid_users', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  plan: varchar('plan', { length: 50 }).notNull().default('standard'),
+  amount: integer('amount'),
+  currency: varchar('currency', { length: 10 }),
+  activatedBy: uuid('activated_by').references(() => users.id, { onDelete: 'set null' }),
+  notes: text('notes'),
+  activatedAt: timestamp('activated_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
 });
 
 export const modules = pgTable('modules', {

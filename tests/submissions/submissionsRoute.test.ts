@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST as submitPOST, GET as historyGET } from '@/app/api/assessments/[assessmentId]/submissions/route';
 import { PUT as assessmentPUT } from '@/app/api/courses/[courseSlug]/modules/[moduleId]/assessment/route';
@@ -88,6 +88,7 @@ describe('assessment submissions API', () => {
   });
   afterEach(() => {
     process.env = { ...originalEnv };
+    vi.unstubAllGlobals();
   });
 
   it('rejects an unauthenticated submission', async () => {
@@ -118,9 +119,19 @@ describe('assessment submissions API', () => {
   });
 
   it(
-    'evaluates a real submission with Gemini, persists it, and returns it in history',
+    'evaluates a Gemini-contract response, persists it, and returns it in history',
     async () => {
       process.env.USE_MOCK_ASSESSMENT_EVALUATION = 'false';
+      process.env.GEMINI_API_KEY = 'test-key';
+      const evaluation = {
+        evaluation_status: 'ok', overall_score: 95, max_score: 100, percentage: 95,
+        performance_level: 'Excellent', summary: 'Accurate and complete.', strengths: [],
+        improvement_areas: [], topic_scores: [], question_feedback: [], next_steps: [], confidence: 0.9,
+      };
+      const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(evaluation) }] } }],
+      }), { status: 200 }));
+      vi.stubGlobal('fetch', fetchMock);
       const assessmentId = await makeAssessment();
 
       const submission = textFile(
@@ -135,6 +146,7 @@ describe('assessment submissions API', () => {
       expect(body.success).toBe(true);
       expect(typeof body.evaluation.overall_score).toBe('number');
       expect(Array.isArray(body.evaluation.strengths)).toBe(true);
+      expect(fetchMock).toHaveBeenCalledOnce();
 
       const historyRes = await historyGET(
         new NextRequest(`http://localhost/api/assessments/${assessmentId}/submissions`, { headers: { cookie: enrolledCookie } }),

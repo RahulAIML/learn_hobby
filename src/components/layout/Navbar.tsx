@@ -2,15 +2,20 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { GurukulLogo } from '@/components/ui/GurukulLogo';
 import { navigationLinks } from '@/data/landingData';
 import { ProgramsMegaMenu } from './ProgramsMegaMenu';
 import { SearchOverlay } from './SearchOverlay';
-import { Menu, X, ChevronDown, ArrowRight, Search } from 'lucide-react';
+import { Menu, X, ChevronDown, ArrowRight, Search, User as UserIcon, LogOut, LayoutDashboard } from 'lucide-react';
 
 interface NavbarProps {
   variant?: 'light' | 'dark';
+}
+
+interface CurrentUser {
+  name: string;
+  role: 'student' | 'admin';
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ variant = 'light' }) => {
@@ -20,7 +25,10 @@ export const Navbar: React.FC<NavbarProps> = ({ variant = 'light' }) => {
   const [programsMenuOpen, setProgramsMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [user, setUser] = useState<CurrentUser | null | undefined>(undefined); // undefined = still checking
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isDark = variant === 'dark';
@@ -32,6 +40,36 @@ export const Navbar: React.FC<NavbarProps> = ({ variant = 'light' }) => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/me')
+      .then(async (res) => {
+        if (!res.ok) {
+          if (!cancelled) setUser(null);
+          return;
+        }
+        const body = await res.json();
+        if (!cancelled) setUser(body.success ? { name: body.user.name, role: body.user.role } : null);
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Re-check whenever the route changes (e.g. right after login/logout redirects).
+  }, [pathname]);
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setUser(null);
+    setAccountMenuOpen(false);
+    router.push('/');
+    router.refresh();
+  };
+
+  const dashboardHref = user?.role === 'admin' ? '/admin' : '/courses/data-science/documents';
 
   const openPrograms = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
@@ -193,16 +231,66 @@ export const Navbar: React.FC<NavbarProps> = ({ variant = 'light' }) => {
               <Search className="w-5 h-5" />
             </button>
 
-            <Link
-              href="/login"
-              className={`px-5 py-2 text-sm font-semibold rounded-full border transition-all duration-200 ${
-                isDark
-                  ? 'border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white'
-                  : 'border-slate-200 text-slate-700 hover:border-red-300 hover:text-red-700 hover:bg-red-50/50'
-              }`}
-            >
-              Login
-            </Link>
+            {user ? (
+              <div
+                className="relative"
+                onMouseEnter={() => setAccountMenuOpen(true)}
+                onMouseLeave={() => setAccountMenuOpen(false)}
+              >
+                <button
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={accountMenuOpen}
+                  onClick={() => setAccountMenuOpen((v) => !v)}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-full border transition-all duration-200 ${
+                    isDark
+                      ? 'border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white'
+                      : 'border-slate-200 text-slate-700 hover:border-red-300 hover:text-red-700 hover:bg-red-50/50'
+                  }`}
+                >
+                  <UserIcon className="w-4 h-4" />
+                  <span className="max-w-[120px] truncate">{user.name}</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${accountMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <div
+                  className={`absolute top-full right-0 w-56 pt-2 transition-all duration-200 ${
+                    accountMenuOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none'
+                  }`}
+                >
+                  <div className="rounded-xl shadow-xl border border-slate-100 bg-white text-slate-900 p-2">
+                    <Link
+                      href={dashboardHref}
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="flex items-center gap-2 p-2.5 rounded-lg text-sm font-semibold hover:bg-red-50 hover:text-red-700 transition-colors"
+                    >
+                      <LayoutDashboard className="w-4 h-4" />
+                      {user.role === 'admin' ? 'Admin Dashboard' : 'My Courses'}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 p-2.5 rounded-lg text-sm font-semibold text-red-700 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Log Out
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : user === null ? (
+              <Link
+                href="/login"
+                className={`px-5 py-2 text-sm font-semibold rounded-full border transition-all duration-200 ${
+                  isDark
+                    ? 'border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white'
+                    : 'border-slate-200 text-slate-700 hover:border-red-300 hover:text-red-700 hover:bg-red-50/50'
+                }`}
+              >
+                Login
+              </Link>
+            ) : (
+              <div className="w-20 h-9" aria-hidden="true" />
+            )}
 
             <Link
               href="/programs/data-science"
@@ -313,17 +401,39 @@ export const Navbar: React.FC<NavbarProps> = ({ variant = 'light' }) => {
           </div>
 
           <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2.5">
-            <Link
-              href="/login"
-              onClick={() => setMobileMenuOpen(false)}
-              className={`w-full py-2.5 text-center text-sm font-semibold rounded-lg border ${
-                isDark
-                  ? 'border-slate-700 text-white'
-                  : 'border-slate-300 text-slate-700'
-              }`}
-            >
-              Login
-            </Link>
+            {user ? (
+              <>
+                <Link
+                  href={dashboardHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`w-full py-2.5 text-center text-sm font-semibold rounded-lg border ${
+                    isDark ? 'border-slate-700 text-white' : 'border-slate-300 text-slate-700'
+                  }`}
+                >
+                  {user.role === 'admin' ? 'Admin Dashboard' : 'My Courses'}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full py-2.5 text-center text-sm font-semibold rounded-lg border border-red-200 text-red-700"
+                >
+                  Log Out
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`w-full py-2.5 text-center text-sm font-semibold rounded-lg border ${
+                  isDark ? 'border-slate-700 text-white' : 'border-slate-300 text-slate-700'
+                }`}
+              >
+                Login
+              </Link>
+            )}
             <Link
               href="/programs/data-science"
               onClick={() => setMobileMenuOpen(false)}

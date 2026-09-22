@@ -9,6 +9,7 @@ export interface User {
   mobile: string | null;
   phoneNo: string | null;
   role: UserRole;
+  lastLoginAt: string | null;
   createdAt: string;
 }
 

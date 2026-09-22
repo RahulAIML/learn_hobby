@@ -25,7 +25,7 @@ export const LoginForm: React.FC = () => {
       if (!res.ok || !body.success) {
         throw new Error(body?.error?.message ?? 'Sign in failed.');
       }
-      router.push('/courses/data-science/documents');
+      router.push(body.user.role === 'admin' ? '/admin' : '/courses/data-science/documents');
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed.');

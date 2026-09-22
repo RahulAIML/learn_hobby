@@ -15,6 +15,20 @@
       "when": 1790092125685,
       "tag": "0001_married_blue_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790101607800,
+      "tag": "0002_giant_the_hood",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790101786772,
+      "tag": "0003_dry_sasquatch",
+      "breakpoints": true
     }
   ]
 }
