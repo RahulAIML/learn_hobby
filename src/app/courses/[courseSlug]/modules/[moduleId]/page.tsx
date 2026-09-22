@@ -15,8 +15,8 @@ interface Props {
   params: { courseSlug: string; moduleId: string };
 }
 
-export function generateMetadata({ params }: Props) {
-  const mod = getModule(params.courseSlug, params.moduleId);
+export async function generateMetadata({ params }: Props) {
+  const mod = await getModule(params.courseSlug, params.moduleId);
   return { title: mod ? `${mod.title} | Gurukul` : 'Module | Gurukul' };
 }
 
@@ -41,10 +41,10 @@ function GateMessage({ icon: Icon, title, message, showLogin }: { icon: typeof S
   );
 }
 
-export default function CourseModulePage({ params }: Props) {
-  const course = getCourse(params.courseSlug);
+export default async function CourseModulePage({ params }: Props) {
+  const course = await getCourse(params.courseSlug);
   if (!course) notFound();
-  const mod = getModule(params.courseSlug, params.moduleId);
+  const mod = await getModule(params.courseSlug, params.moduleId);
   if (!mod) notFound();
 
   const token = cookies().get(SESSION_COOKIE)?.value;
@@ -57,7 +57,7 @@ export default function CourseModulePage({ params }: Props) {
     gate = <GateMessage icon={ShieldAlert} title="Not Enrolled" message={`You are not enrolled in ${course.title}.`} />;
   }
 
-  const assessment = getAssessmentByModule(mod.id);
+  const assessment = await getAssessmentByModule(mod.id);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

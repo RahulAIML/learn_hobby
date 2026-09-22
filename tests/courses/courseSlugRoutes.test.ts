@@ -1,16 +1,22 @@
-import { describe, it, expect } from 'vitest';
-import type { NextRequest } from 'next/server';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { NextRequest } from 'next/server';
 import { POST as createCoursePOST, GET as listCoursesGET } from '@/app/api/courses/route';
 import { PATCH, DELETE } from '@/app/api/courses/[courseSlug]/route';
 import { POST as listDocsPOST } from '@/app/api/courses/[courseSlug]/documents/route';
 import { GET as documentsGET } from '@/app/api/courses/[courseSlug]/documents/route';
+import { createAdminCookie } from '../helpers/adminAuth';
+
+let adminCookie: string;
 
 function jsonRequest(url: string, method: string, body?: unknown): NextRequest {
-  return new Request(url, {
+  return new NextRequest(url, {
     method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    headers: {
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      cookie: adminCookie,
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
-  }) as unknown as NextRequest;
+  });
 }
 
 function pdfFile(name = 'doc.pdf'): File {
@@ -21,6 +27,10 @@ function pdfFile(name = 'doc.pdf'): File {
 }
 
 describe('/api/courses/[courseSlug] (rename/delete)', () => {
+  beforeAll(async () => {
+    adminCookie = await createAdminCookie();
+  });
+
   it('PATCH renames a course, keeping its slug', async () => {
     await createCoursePOST(jsonRequest('http://localhost/api/courses', 'POST', { title: 'Rename Me' }));
 
@@ -56,7 +66,7 @@ describe('/api/courses/[courseSlug] (rename/delete)', () => {
     const formData = new FormData();
     formData.append('file', pdfFile());
     await listDocsPOST(
-      new Request('http://localhost/api/courses/delete-me/documents', { method: 'POST', body: formData }) as unknown as NextRequest,
+      new NextRequest('http://localhost/api/courses/delete-me/documents', { method: 'POST', body: formData, headers: { cookie: adminCookie } }),
       { params: { courseSlug: 'delete-me' } }
     );
 

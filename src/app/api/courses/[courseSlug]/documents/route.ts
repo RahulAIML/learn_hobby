@@ -4,6 +4,7 @@ import { validateUploadedFile } from '@/lib/assessment/fileValidation.server';
 import { listDocuments, createDocument } from '@/lib/courseDocuments/store';
 import { toSummary } from '@/lib/courseDocuments/types';
 import { getSessionUser } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/adminGuard';
 
 export const runtime = 'nodejs';
 
@@ -21,7 +22,7 @@ interface RouteParams {
  * feature). A logged-in student who is NOT enrolled is rejected with 403.
  */
 export async function GET(req: NextRequest, { params }: RouteParams) {
-  const course = getCourse(params.courseSlug);
+  const course = await getCourse(params.courseSlug);
   if (!course) {
     return NextResponse.json({ success: false, error: { code: 'course_not_found', message: 'Course not found.' } }, { status: 404 });
   }
@@ -31,22 +32,16 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ success: false, error: { code: 'forbidden', message: 'You are not enrolled in this course.' } }, { status: 403 });
   }
 
-  const documents = listDocuments(params.courseSlug).map(toSummary);
+  const documents = (await listDocuments(params.courseSlug)).map(toSummary);
   return NextResponse.json({ success: true, course, documents });
 }
 
-/**
- * Admin: upload a new document to a course.
- *
- * NOTE ON ACCESS CONTROL: this project has no authentication/authorization
- * system yet (see /login — an honest placeholder, not real auth). There is
- * therefore no way to genuinely verify "the caller is an admin" here. This
- * endpoint is real, working CRUD — it is deliberately NOT wired behind a
- * fake permission check that would only look secure. When real auth exists,
- * add an admin-role check here before createDocument().
- */
+/** Admin: upload a new document to a course. */
 export async function POST(req: NextRequest, { params }: RouteParams) {
-  const course = getCourse(params.courseSlug);
+  const auth = requireAdmin(req);
+  if ('response' in auth) return auth.response;
+
+  const course = await getCourse(params.courseSlug);
   if (!course) {
     return NextResponse.json({ success: false, error: { code: 'course_not_found', message: 'Course not found.' } }, { status: 404 });
   }
@@ -72,7 +67,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ success: false, error: { code: 'invalid_file', message: validation.error } }, { status: 400 });
   }
 
-  const doc = createDocument({
+  const doc = await createDocument({
     courseSlug: params.courseSlug,
     moduleId,
     title,

@@ -18,7 +18,14 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
-    testTimeout: 20000,
+    testTimeout: 30000,
+    hookTimeout: 30000,
+    // Each test file spins up its own embedded Postgres (PGlite, WASM) —
+    // running too many concurrently strains I/O on Windows and causes
+    // spurious failures unrelated to test correctness.
+    poolOptions: {
+      threads: { maxThreads: 4, minThreads: 1 },
+    },
     env: {
       ...loadDotEnvLocal(),
       SESSION_SECRET: 'test-session-secret-do-not-use-in-production',

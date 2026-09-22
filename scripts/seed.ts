@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { eq } from 'drizzle-orm';
-import { users, enrollments } from '../src/lib/db/schema';
+import { users, enrollments, courses, modules, assessments } from '../src/lib/db/schema';
 import { hashPassword } from '../src/lib/auth/password';
 import { resolveSslOption } from '../src/lib/db/connectionOptions';
 
@@ -22,9 +22,9 @@ async function main() {
   const client = postgres(connectionString, { max: 1, ssl: resolveSslOption(connectionString) });
   const db = drizzle(client);
 
-  const existing = await db.select().from(users).where(eq(users.email, 'student@gurukul.dev')).limit(1);
-
-  if (existing.length > 0) {
+  // Demo student
+  const existingStudent = await db.select().from(users).where(eq(users.email, 'student@gurukul.dev')).limit(1);
+  if (existingStudent.length > 0) {
     console.log('Demo student already seeded, skipping.');
   } else {
     const studentId = randomUUID();
@@ -38,6 +38,54 @@ async function main() {
     });
     await db.insert(enrollments).values({ userId: studentId, courseSlug: 'data-science' });
     console.log('Seeded demo student: student@gurukul.dev / student123 (enrolled in data-science)');
+  }
+
+  // Demo admin
+  const existingAdmin = await db.select().from(users).where(eq(users.email, 'admin@gurukul.dev')).limit(1);
+  if (existingAdmin.length > 0) {
+    console.log('Demo admin already seeded, skipping.');
+  } else {
+    await db.insert(users).values({
+      id: randomUUID(),
+      username: 'admin',
+      email: 'admin@gurukul.dev',
+      name: 'Gurukul Admin',
+      passwordHash: hashPassword('admin12345'),
+      role: 'admin',
+    });
+    console.log('Seeded demo admin: admin@gurukul.dev / admin12345');
+  }
+
+  // Flagship course + module + assessment
+  const existingCourse = await db.select().from(courses).where(eq(courses.slug, 'data-science')).limit(1);
+  if (existingCourse.length > 0) {
+    console.log('Course "data-science" already seeded, skipping.');
+  } else {
+    await db.insert(courses).values({ slug: 'data-science', title: 'Data Science Championship Program™' });
+
+    const moduleId = randomUUID();
+    await db.insert(modules).values({
+      id: moduleId,
+      courseSlug: 'data-science',
+      title: 'Module 2: Python for Data Analysis',
+      order: 1,
+    });
+
+    await db.insert(assessments).values({
+      id: randomUUID(),
+      moduleId,
+      courseSlug: 'data-science',
+      title: 'Module 2 Assessment: Lists vs. Tuples',
+      instructions:
+        'Answer the questions about Python lists and tuples covered in the module document. Explain mutability, syntax differences, and give one real-world use case for each. Upload your answers as a single file.',
+      rubric:
+        'Full credit requires: correct mutability explanation, correct syntax examples, at least one valid use case per data structure, and clear writing.',
+      maxScore: 100,
+      allowedFormats: ['.pdf', '.docx', '.xlsx', '.txt', '.png', '.jpg', '.jpeg'],
+      status: 'active',
+    });
+
+    console.log('Seeded course "data-science" with a demo module and assessment.');
   }
 
   await client.end();

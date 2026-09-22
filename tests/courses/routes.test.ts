@@ -1,17 +1,36 @@
-import { describe, it, expect } from 'vitest';
-import type { NextRequest } from 'next/server';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/courses/route';
+import { createAdminCookie } from '../helpers/adminAuth';
+
+let adminCookie: string;
 
 function jsonRequest(body: unknown): NextRequest {
-  return new Request('http://localhost/api/courses', {
+  return new NextRequest('http://localhost/api/courses', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', cookie: adminCookie },
     body: JSON.stringify(body),
-  }) as unknown as NextRequest;
+  });
 }
 
 describe('courses API routes', () => {
-  it('GET lists the seeded course', async () => {
+  beforeAll(async () => {
+    adminCookie = await createAdminCookie();
+  });
+
+  it('POST rejects an unauthenticated caller', async () => {
+    const res = await POST(
+      new NextRequest('http://localhost/api/courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'No Auth' }),
+      })
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('GET lists a created course', async () => {
+    await POST(jsonRequest({ title: 'Data Science' }));
     const res = await GET();
     const body = await res.json();
     expect(res.status).toBe(200);

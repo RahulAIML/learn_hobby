@@ -6,13 +6,19 @@ import { POST as createModulePOST } from '@/app/api/courses/[courseSlug]/modules
 import { createUser, enrollUser, listEnrollments } from '@/lib/auth/store';
 import { createSessionToken, SESSION_COOKIE } from '@/lib/auth/session';
 import { toPublicUser } from '@/lib/auth/types';
+import { createCourse } from '@/lib/courses/store';
+import { createAdminCookie } from '../helpers/adminAuth';
 
 const COURSE = 'data-science';
 
 let enrolledCookie: string;
 let outsiderCookie: string;
+let adminCookie: string;
 
 beforeAll(async () => {
+  await createCourse('Data Science');
+  adminCookie = await createAdminCookie();
+
   const enrolledResult = await createUser({
     username: `submtest_${Date.now()}`,
     email: `submtest-${Date.now()}@gurukul.dev`,
@@ -37,7 +43,7 @@ async function makeAssessment(): Promise<string> {
   const modRes = await createModulePOST(
     new NextRequest(`http://localhost/api/courses/${COURSE}/modules`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', cookie: adminCookie },
       body: JSON.stringify({ title: `Submission Test Module ${Date.now()}` }),
     }),
     { params: { courseSlug: COURSE } }
@@ -47,7 +53,7 @@ async function makeAssessment(): Promise<string> {
   const assessmentRes = await assessmentPUT(
     new NextRequest(`http://localhost/api/courses/${COURSE}/modules/${mod.id}/assessment`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', cookie: adminCookie },
       body: JSON.stringify({
         title: 'Lists vs Tuples Quiz',
         instructions: 'Explain the difference between Python lists and tuples, with one example of each.',

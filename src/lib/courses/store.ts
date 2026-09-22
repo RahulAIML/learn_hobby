@@ -1,22 +1,19 @@
+import { eq } from 'drizzle-orm';
+import { getDb } from '@/lib/db/client';
+import { courses as coursesTable } from '@/lib/db/schema';
 import type { Course } from '@/lib/courseDocuments/types';
 
-/**
- * In-memory course catalog store. Same limitation as
- * courseDocuments/store.ts: no database is configured, so this lives in a
- * single function instance's memory and does NOT survive a redeploy or
- * cold start. Real, working CRUD — not a fake — just not yet durable.
- */
+/** Postgres-backed course catalog store (Drizzle). Real, durable persistence. */
 
-const SEED_COURSES: Course[] = [{ slug: 'data-science', title: 'Data Science Championship Program™' }];
-
-const courses = new Map<string, Course>(SEED_COURSES.map((c) => [c.slug, c]));
-
-export function listCourses(): Course[] {
-  return Array.from(courses.values());
+export async function listCourses(): Promise<Course[]> {
+  const db = await getDb();
+  return db.select().from(coursesTable);
 }
 
-export function getCourse(slug: string): Course | undefined {
-  return courses.get(slug);
+export async function getCourse(slug: string): Promise<Course | undefined> {
+  const db = await getDb();
+  const [row] = await db.select().from(coursesTable).where(eq(coursesTable.slug, slug)).limit(1);
+  return row;
 }
 
 function slugify(title: string): string {
@@ -29,34 +26,37 @@ function slugify(title: string): string {
 
 export type CreateCourseError = 'invalid_title' | 'slug_taken';
 
-export function createCourse(title: string): { course: Course } | { error: CreateCourseError } {
+export async function createCourse(title: string): Promise<{ course: Course } | { error: CreateCourseError }> {
   const trimmed = title.trim();
   if (!trimmed) return { error: 'invalid_title' };
 
   const slug = slugify(trimmed);
   if (!slug) return { error: 'invalid_title' };
-  if (courses.has(slug)) return { error: 'slug_taken' };
+
+  const db = await getDb();
+  if (await getCourse(slug)) return { error: 'slug_taken' };
 
   const course: Course = { slug, title: trimmed };
-  courses.set(slug, course);
+  await db.insert(coursesTable).values(course);
   return { course };
 }
 
 export type UpdateCourseError = 'invalid_title' | 'course_not_found';
 
 /** Renames a course. The slug (and therefore its URL/documents) stays the same — only the display title changes. */
-export function updateCourse(slug: string, title: string): { course: Course } | { error: UpdateCourseError } {
-  const existing = courses.get(slug);
-  if (!existing) return { error: 'course_not_found' };
-
+export async function updateCourse(slug: string, title: string): Promise<{ course: Course } | { error: UpdateCourseError }> {
   const trimmed = title.trim();
   if (!trimmed) return { error: 'invalid_title' };
 
-  const updated: Course = { ...existing, title: trimmed };
-  courses.set(slug, updated);
-  return { course: updated };
+  const db = await getDb();
+  const [row] = await db.update(coursesTable).set({ title: trimmed }).where(eq(coursesTable.slug, slug)).returning();
+  if (!row) return { error: 'course_not_found' };
+
+  return { course: row };
 }
 
-export function deleteCourse(slug: string): boolean {
-  return courses.delete(slug);
+export async function deleteCourse(slug: string): Promise<boolean> {
+  const db = await getDb();
+  const deleted = await db.delete(coursesTable).where(eq(coursesTable.slug, slug)).returning();
+  return deleted.length > 0;
 }

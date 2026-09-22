@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { eq, and } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { users, enrollments } from '@/lib/db/schema';
+import { isUuid } from '@/lib/db/isUuid';
 import { hashPassword } from './password';
 import type { User, UserRole } from './types';
 
@@ -26,6 +27,7 @@ function rowToUser(row: typeof users.$inferSelect): User {
 }
 
 export async function getUserById(id: string): Promise<User | undefined> {
+  if (!isUuid(id)) return undefined;
   const db = await getDb();
   const [row] = await db.select().from(users).where(eq(users.id, id)).limit(1);
   return row ? rowToUser(row) : undefined;

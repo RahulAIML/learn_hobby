@@ -1,20 +1,28 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { listDocuments, createDocument, replaceDocument, deleteDocument, getDocument } from '@/lib/courseDocuments/store';
+import { createCourse } from '@/lib/courses/store';
 
 const COURSE = 'test-course-store';
+const COURSE_2 = 'test-course-store-2';
 
 describe('courseDocuments store', () => {
-  beforeEach(() => {
+  beforeAll(async () => {
+    await createCourse(COURSE);
+    await createCourse(COURSE_2);
+  });
+
+  beforeEach(async () => {
     // Clean slate: delete anything left over from a previous test in this file.
-    listDocuments(COURSE).forEach((doc) => deleteDocument(COURSE, doc.id));
+    const docs = await listDocuments(COURSE);
+    await Promise.all(docs.map((doc) => deleteDocument(COURSE, doc.id)));
   });
 
-  it('starts empty for an unknown course', () => {
-    expect(listDocuments('never-seen-course')).toEqual([]);
+  it('starts empty for an unknown course', async () => {
+    expect(await listDocuments('never-seen-course')).toEqual([]);
   });
 
-  it('creates and lists a document', () => {
-    const doc = createDocument({
+  it('creates and lists a document', async () => {
+    const doc = await createDocument({
       courseSlug: COURSE,
       title: 'Syllabus',
       filename: 'syllabus.pdf',
@@ -24,12 +32,12 @@ describe('courseDocuments store', () => {
     });
 
     expect(doc.id).toBeTruthy();
-    expect(listDocuments(COURSE)).toHaveLength(1);
-    expect(getDocument(COURSE, doc.id)?.title).toBe('Syllabus');
+    expect(await listDocuments(COURSE)).toHaveLength(1);
+    expect((await getDocument(COURSE, doc.id))?.title).toBe('Syllabus');
   });
 
-  it('replaces a document in place, keeping its id', () => {
-    const doc = createDocument({
+  it('replaces a document in place, keeping its id', async () => {
+    const doc = await createDocument({
       courseSlug: COURSE,
       title: 'Notes v1',
       filename: 'notes.txt',
@@ -38,7 +46,7 @@ describe('courseDocuments store', () => {
       sizeBytes: 2,
     });
 
-    const updated = replaceDocument(COURSE, doc.id, {
+    const updated = await replaceDocument(COURSE, doc.id, {
       filename: 'notes.txt',
       mimeType: 'text/plain',
       data: Buffer.from('v2').toString('base64'),
@@ -47,11 +55,11 @@ describe('courseDocuments store', () => {
 
     expect(updated?.id).toBe(doc.id);
     expect(Buffer.from(updated!.data, 'base64').toString()).toBe('v2');
-    expect(listDocuments(COURSE)).toHaveLength(1);
+    expect(await listDocuments(COURSE)).toHaveLength(1);
   });
 
-  it('returns undefined when replacing a document that does not exist', () => {
-    const result = replaceDocument(COURSE, 'does-not-exist', {
+  it('returns undefined when replacing a document that does not exist', async () => {
+    const result = await replaceDocument(COURSE, 'does-not-exist', {
       filename: 'x.txt',
       mimeType: 'text/plain',
       data: 'ZmFrZQ==',
@@ -60,8 +68,8 @@ describe('courseDocuments store', () => {
     expect(result).toBeUndefined();
   });
 
-  it('deletes a document', () => {
-    const doc = createDocument({
+  it('deletes a document', async () => {
+    const doc = await createDocument({
       courseSlug: COURSE,
       title: 'To delete',
       filename: 'temp.txt',
@@ -69,13 +77,13 @@ describe('courseDocuments store', () => {
       data: 'eA==',
       sizeBytes: 1,
     });
-    expect(deleteDocument(COURSE, doc.id)).toBe(true);
-    expect(listDocuments(COURSE)).toHaveLength(0);
-    expect(deleteDocument(COURSE, doc.id)).toBe(false);
+    expect(await deleteDocument(COURSE, doc.id)).toBe(true);
+    expect(await listDocuments(COURSE)).toHaveLength(0);
+    expect(await deleteDocument(COURSE, doc.id)).toBe(false);
   });
 
-  it('keeps documents scoped to their own course', () => {
-    createDocument({
+  it('keeps documents scoped to their own course', async () => {
+    await createDocument({
       courseSlug: COURSE,
       title: 'Course A doc',
       filename: 'a.txt',
@@ -83,8 +91,8 @@ describe('courseDocuments store', () => {
       data: 'YQ==',
       sizeBytes: 1,
     });
-    createDocument({
-      courseSlug: 'test-course-store-2',
+    await createDocument({
+      courseSlug: COURSE_2,
       title: 'Course B doc',
       filename: 'b.txt',
       mimeType: 'text/plain',
@@ -92,8 +100,9 @@ describe('courseDocuments store', () => {
       sizeBytes: 1,
     });
 
-    expect(listDocuments(COURSE)).toHaveLength(1);
-    expect(listDocuments('test-course-store-2')).toHaveLength(1);
-    deleteDocument('test-course-store-2', listDocuments('test-course-store-2')[0].id);
+    expect(await listDocuments(COURSE)).toHaveLength(1);
+    const course2Docs = await listDocuments(COURSE_2);
+    expect(course2Docs).toHaveLength(1);
+    await deleteDocument(COURSE_2, course2Docs[0].id);
   });
 });

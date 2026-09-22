@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getModule } from '@/lib/modules/store';
 import { getAssessmentByModule, upsertAssessment, deleteAssessmentForModule } from '@/lib/assessments/store';
+import { requireAdmin } from '@/lib/auth/adminGuard';
 
 export const runtime = 'nodejs';
 
@@ -10,11 +11,11 @@ interface RouteParams {
 }
 
 export async function GET(_req: NextRequest, { params }: RouteParams) {
-  const mod = getModule(params.courseSlug, params.moduleId);
+  const mod = await getModule(params.courseSlug, params.moduleId);
   if (!mod) {
     return NextResponse.json({ success: false, error: { code: 'module_not_found', message: 'Module not found.' } }, { status: 404 });
   }
-  const assessment = getAssessmentByModule(params.moduleId);
+  const assessment = await getAssessmentByModule(params.moduleId);
   if (!assessment) {
     return NextResponse.json({ success: false, error: { code: 'assessment_not_found', message: 'This module has no assessment yet.' } }, { status: 404 });
   }
@@ -29,9 +30,12 @@ const upsertSchema = z.object({
   status: z.enum(['active', 'draft']).optional(),
 });
 
-/** Admin: create or update the module's assessment. Same access-control note as other admin routes. */
+/** Admin: create or update the module's assessment. */
 export async function PUT(req: NextRequest, { params }: RouteParams) {
-  const mod = getModule(params.courseSlug, params.moduleId);
+  const auth = requireAdmin(req);
+  if ('response' in auth) return auth.response;
+
+  const mod = await getModule(params.courseSlug, params.moduleId);
   if (!mod) {
     return NextResponse.json({ success: false, error: { code: 'module_not_found', message: 'Module not found.' } }, { status: 404 });
   }
@@ -48,12 +52,15 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ success: false, error: { code: 'invalid_request', message: 'Title and instructions are required.' } }, { status: 400 });
   }
 
-  const assessment = upsertAssessment(params.moduleId, params.courseSlug, parsed.data);
+  const assessment = await upsertAssessment(params.moduleId, params.courseSlug, parsed.data);
   return NextResponse.json({ success: true, assessment });
 }
 
-export async function DELETE(_req: NextRequest, { params }: RouteParams) {
-  const removed = deleteAssessmentForModule(params.moduleId);
+export async function DELETE(req: NextRequest, { params }: RouteParams) {
+  const auth = requireAdmin(req);
+  if ('response' in auth) return auth.response;
+
+  const removed = await deleteAssessmentForModule(params.moduleId);
   if (!removed) {
     return NextResponse.json({ success: false, error: { code: 'assessment_not_found', message: 'This module has no assessment.' } }, { status: 404 });
   }

@@ -7,16 +7,22 @@ import {
   DELETE as docDELETE,
 } from '@/app/api/courses/[courseSlug]/documents/[docId]/route';
 import { listDocuments, deleteDocument } from '@/lib/courseDocuments/store';
+import { createCourse } from '@/lib/courses/store';
 import { createUser, enrollUser, listEnrollments } from '@/lib/auth/store';
 import { createSessionToken, SESSION_COOKIE } from '@/lib/auth/session';
 import { toPublicUser } from '@/lib/auth/types';
+import { createAdminCookie } from '../helpers/adminAuth';
 
 const COURSE = 'data-science';
 
 let enrolledCookie: string;
 let outsiderCookie: string;
+let adminCookie: string;
 
 beforeAll(async () => {
+  await createCourse('Data Science');
+  adminCookie = await createAdminCookie();
+
   const enrolledResult = await createUser({
     username: `enrolled_${Date.now()}`,
     email: `enrolled-${Date.now()}@gurukul.dev`,
@@ -54,8 +60,9 @@ function plainRequest(url: string, method: string, cookie?: string): NextRequest
 }
 
 describe('course documents API routes', () => {
-  beforeEach(() => {
-    listDocuments(COURSE).forEach((doc) => deleteDocument(COURSE, doc.id));
+  beforeEach(async () => {
+    const docs = await listDocuments(COURSE);
+    await Promise.all(docs.map((doc) => deleteDocument(COURSE, doc.id)));
   });
 
   it('GET list returns 404 for an unknown course', async () => {
@@ -67,7 +74,7 @@ describe('course documents API routes', () => {
 
   it('POST rejects a request with no file', async () => {
     const fd = new FormData();
-    const res = await listPOST(requestWithForm('http://localhost/api/courses/data-science/documents', fd, 'POST'), {
+    const res = await listPOST(requestWithForm('http://localhost/api/courses/data-science/documents', fd, 'POST', adminCookie), {
       params: { courseSlug: COURSE },
     });
     const body = await res.json();
@@ -78,7 +85,7 @@ describe('course documents API routes', () => {
   it('POST rejects an unsupported file type', async () => {
     const fd = new FormData();
     fd.append('file', new File([new Uint8Array(10)], 'virus.exe', { type: 'application/octet-stream' }));
-    const res = await listPOST(requestWithForm('http://localhost/api/courses/data-science/documents', fd, 'POST'), {
+    const res = await listPOST(requestWithForm('http://localhost/api/courses/data-science/documents', fd, 'POST', adminCookie), {
       params: { courseSlug: COURSE },
     });
     const body = await res.json();
@@ -92,7 +99,7 @@ describe('course documents API routes', () => {
     createFd.append('file', pdfFile('syllabus.pdf'));
     createFd.append('title', 'Course Syllabus');
     const createRes = await listPOST(
-      requestWithForm('http://localhost/api/courses/data-science/documents', createFd, 'POST'),
+      requestWithForm('http://localhost/api/courses/data-science/documents', createFd, 'POST', adminCookie),
       { params: { courseSlug: COURSE } }
     );
     expect(createRes.status).toBe(201);
@@ -138,7 +145,7 @@ describe('course documents API routes', () => {
     const replaceFd = new FormData();
     replaceFd.append('file', pdfFile('syllabus-v2.pdf'));
     const replaceRes = await docPUT(
-      requestWithForm(`http://localhost/api/courses/data-science/documents/${docId}`, replaceFd, 'PUT'),
+      requestWithForm(`http://localhost/api/courses/data-science/documents/${docId}`, replaceFd, 'PUT', adminCookie),
       { params: { courseSlug: COURSE, docId } }
     );
     expect(replaceRes.status).toBe(200);
@@ -148,7 +155,7 @@ describe('course documents API routes', () => {
 
     // Delete
     const deleteRes = await docDELETE(
-      plainRequest(`http://localhost/api/courses/data-science/documents/${docId}`, 'DELETE'),
+      plainRequest(`http://localhost/api/courses/data-science/documents/${docId}`, 'DELETE', adminCookie),
       { params: { courseSlug: COURSE, docId } }
     );
     expect(deleteRes.status).toBe(200);
@@ -164,13 +171,13 @@ describe('course documents API routes', () => {
     const fd = new FormData();
     fd.append('file', pdfFile());
     const replaceRes = await docPUT(
-      requestWithForm('http://localhost/api/courses/data-science/documents/missing-id', fd, 'PUT'),
+      requestWithForm('http://localhost/api/courses/data-science/documents/missing-id', fd, 'PUT', adminCookie),
       { params: { courseSlug: COURSE, docId: 'missing-id' } }
     );
     expect(replaceRes.status).toBe(404);
 
     const deleteRes = await docDELETE(
-      plainRequest('http://localhost/api/courses/data-science/documents/missing-id', 'DELETE'),
+      plainRequest('http://localhost/api/courses/data-science/documents/missing-id', 'DELETE', adminCookie),
       { params: { courseSlug: COURSE, docId: 'missing-id' } }
     );
     expect(deleteRes.status).toBe(404);

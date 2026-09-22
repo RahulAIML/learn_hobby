@@ -1,29 +1,42 @@
 import { randomUUID } from 'crypto';
+import { eq, and } from 'drizzle-orm';
+import { getDb } from '@/lib/db/client';
+import { courseDocuments } from '@/lib/db/schema';
+import { isUuid } from '@/lib/db/isUuid';
 import type { CourseDocument } from './types';
 
-/**
- * In-memory, server-only document store.
- *
- * LIMITATION (documented, same pattern as rateLimit.ts): this project has
- * no database or blob storage configured. Vercel's serverless filesystem
- * is read-only at runtime, so writing to disk is not an option either.
- * This store lives in a single function instance's memory — it works
- * correctly for the lifetime of a warm instance, but is NOT durable
- * across cold starts or multiple instances, and documents added here
- * will NOT survive a redeploy. It is real, working CRUD, not a fake —
- * just not yet backed by persistent storage. Swapping the functions
- * below for real database calls does not require changing any caller
- * (API routes and components only import these functions).
- */
+/** Postgres-backed document store (Drizzle). Real, durable persistence. */
 
-const documentsByCourse = new Map<string, CourseDocument[]>();
-
-export function listDocuments(courseSlug: string): CourseDocument[] {
-  return documentsByCourse.get(courseSlug) ?? [];
+function rowToDocument(row: typeof courseDocuments.$inferSelect): CourseDocument {
+  return {
+    id: row.id,
+    courseSlug: row.courseSlug,
+    moduleId: row.moduleId,
+    title: row.title,
+    filename: row.filename,
+    mimeType: row.mimeType,
+    data: row.data,
+    sizeBytes: row.sizeBytes,
+    uploadedAt: row.uploadedAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
 }
 
-export function getDocument(courseSlug: string, id: string): CourseDocument | undefined {
-  return listDocuments(courseSlug).find((doc) => doc.id === id);
+export async function listDocuments(courseSlug: string): Promise<CourseDocument[]> {
+  const db = await getDb();
+  const rows = await db.select().from(courseDocuments).where(eq(courseDocuments.courseSlug, courseSlug));
+  return rows.map(rowToDocument);
+}
+
+export async function getDocument(courseSlug: string, id: string): Promise<CourseDocument | undefined> {
+  if (!isUuid(id)) return undefined;
+  const db = await getDb();
+  const [row] = await db
+    .select()
+    .from(courseDocuments)
+    .where(and(eq(courseDocuments.courseSlug, courseSlug), eq(courseDocuments.id, id)))
+    .limit(1);
+  return row ? rowToDocument(row) : undefined;
 }
 
 export interface CreateDocumentInput {
@@ -36,23 +49,25 @@ export interface CreateDocumentInput {
   sizeBytes: number;
 }
 
-export function createDocument(input: CreateDocumentInput): CourseDocument {
-  const now = new Date().toISOString();
-  const doc: CourseDocument = {
-    id: randomUUID(),
-    courseSlug: input.courseSlug,
-    moduleId: input.moduleId ?? null,
-    title: input.title,
-    filename: input.filename,
-    mimeType: input.mimeType,
-    data: input.data,
-    sizeBytes: input.sizeBytes,
-    uploadedAt: now,
-    updatedAt: now,
-  };
-  const existing = documentsByCourse.get(input.courseSlug) ?? [];
-  documentsByCourse.set(input.courseSlug, [...existing, doc]);
-  return doc;
+export async function createDocument(input: CreateDocumentInput): Promise<CourseDocument> {
+  const db = await getDb();
+  const now = new Date();
+  const [row] = await db
+    .insert(courseDocuments)
+    .values({
+      id: randomUUID(),
+      courseSlug: input.courseSlug,
+      moduleId: input.moduleId ?? null,
+      title: input.title,
+      filename: input.filename,
+      mimeType: input.mimeType,
+      data: input.data,
+      sizeBytes: input.sizeBytes,
+      uploadedAt: now,
+      updatedAt: now,
+    })
+    .returning();
+  return rowToDocument(row);
 }
 
 export interface ReplaceDocumentInput {
@@ -64,41 +79,42 @@ export interface ReplaceDocumentInput {
 }
 
 /** Replaces a document's file content (and optionally its title) in place, preserving its id. */
-export function replaceDocument(
+export async function replaceDocument(
   courseSlug: string,
   id: string,
   input: ReplaceDocumentInput
-): CourseDocument | undefined {
-  const list = documentsByCourse.get(courseSlug);
-  if (!list) return undefined;
-  const idx = list.findIndex((doc) => doc.id === id);
-  if (idx === -1) return undefined;
-
-  const updated: CourseDocument = {
-    ...list[idx],
-    title: input.title ?? list[idx].title,
+): Promise<CourseDocument | undefined> {
+  if (!isUuid(id)) return undefined;
+  const db = await getDb();
+  const patch: Partial<typeof courseDocuments.$inferInsert> = {
     filename: input.filename,
     mimeType: input.mimeType,
     data: input.data,
     sizeBytes: input.sizeBytes,
-    updatedAt: new Date().toISOString(),
+    updatedAt: new Date(),
   };
-  const nextList = [...list];
-  nextList[idx] = updated;
-  documentsByCourse.set(courseSlug, nextList);
-  return updated;
+  if (input.title !== undefined) patch.title = input.title;
+
+  const [row] = await db
+    .update(courseDocuments)
+    .set(patch)
+    .where(and(eq(courseDocuments.courseSlug, courseSlug), eq(courseDocuments.id, id)))
+    .returning();
+  return row ? rowToDocument(row) : undefined;
 }
 
-export function deleteDocument(courseSlug: string, id: string): boolean {
-  const list = documentsByCourse.get(courseSlug);
-  if (!list) return false;
-  const next = list.filter((doc) => doc.id !== id);
-  const removed = next.length !== list.length;
-  documentsByCourse.set(courseSlug, next);
-  return removed;
+export async function deleteDocument(courseSlug: string, id: string): Promise<boolean> {
+  if (!isUuid(id)) return false;
+  const db = await getDb();
+  const deleted = await db
+    .delete(courseDocuments)
+    .where(and(eq(courseDocuments.courseSlug, courseSlug), eq(courseDocuments.id, id)))
+    .returning();
+  return deleted.length > 0;
 }
 
 /** Deletes every document belonging to a course — used when the course itself is deleted. */
-export function deleteAllDocuments(courseSlug: string): void {
-  documentsByCourse.delete(courseSlug);
+export async function deleteAllDocuments(courseSlug: string): Promise<void> {
+  const db = await getDb();
+  await db.delete(courseDocuments).where(eq(courseDocuments.courseSlug, courseSlug));
 }

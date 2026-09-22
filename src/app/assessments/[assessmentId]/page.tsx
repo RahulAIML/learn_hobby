@@ -13,8 +13,8 @@ interface Props {
   params: { assessmentId: string };
 }
 
-export function generateMetadata({ params }: Props) {
-  const assessment = getAssessmentById(params.assessmentId);
+export async function generateMetadata({ params }: Props) {
+  const assessment = await getAssessmentById(params.assessmentId);
   return { title: assessment ? `${assessment.title} | Gurukul` : 'Assessment | Gurukul' };
 }
 
@@ -39,8 +39,8 @@ function GateMessage({ icon: Icon, title, message, showLogin }: { icon: typeof S
   );
 }
 
-export default function AssessmentDetailPage({ params }: Props) {
-  const assessment = getAssessmentById(params.assessmentId);
+export default async function AssessmentDetailPage({ params }: Props) {
+  const assessment = await getAssessmentById(params.assessmentId);
   if (!assessment || assessment.status !== 'active') notFound();
 
   const token = cookies().get(SESSION_COOKIE)?.value;

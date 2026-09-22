@@ -3,6 +3,7 @@ import { validateUploadedFile } from '@/lib/assessment/fileValidation.server';
 import { getDocument, replaceDocument, deleteDocument } from '@/lib/courseDocuments/store';
 import { toSummary } from '@/lib/courseDocuments/types';
 import { getSessionUser } from '@/lib/auth/session';
+import { requireAdmin } from '@/lib/auth/adminGuard';
 
 export const runtime = 'nodejs';
 
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ success: false, error: { code: 'forbidden', message: 'You are not enrolled in this course.' } }, { status: 403 });
   }
 
-  const doc = getDocument(params.courseSlug, params.docId);
+  const doc = await getDocument(params.courseSlug, params.docId);
   if (!doc) {
     return NextResponse.json({ success: false, error: { code: 'document_not_found', message: 'Document not found.' } }, { status: 404 });
   }
@@ -48,9 +49,12 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   });
 }
 
-/** Admin: replace a document's file content in place (keeps the same id/URL). See POST route for the access-control note. */
+/** Admin: replace a document's file content in place (keeps the same id/URL). */
 export async function PUT(req: NextRequest, { params }: RouteParams) {
-  const existing = getDocument(params.courseSlug, params.docId);
+  const auth = requireAdmin(req);
+  if ('response' in auth) return auth.response;
+
+  const existing = await getDocument(params.courseSlug, params.docId);
   if (!existing) {
     return NextResponse.json({ success: false, error: { code: 'document_not_found', message: 'Document not found.' } }, { status: 404 });
   }
@@ -74,7 +78,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ success: false, error: { code: 'invalid_file', message: validation.error } }, { status: 400 });
   }
 
-  const updated = replaceDocument(params.courseSlug, params.docId, {
+  const updated = await replaceDocument(params.courseSlug, params.docId, {
     title,
     filename: validation.safeFilename ?? file.name,
     mimeType: validation.detectedMime ?? file.type,
@@ -89,9 +93,12 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
   return NextResponse.json({ success: true, document: toSummary(updated) });
 }
 
-/** Admin: delete a document. See POST route for the access-control note. */
-export async function DELETE(_req: NextRequest, { params }: RouteParams) {
-  const removed = deleteDocument(params.courseSlug, params.docId);
+/** Admin: delete a document. */
+export async function DELETE(req: NextRequest, { params }: RouteParams) {
+  const auth = requireAdmin(req);
+  if ('response' in auth) return auth.response;
+
+  const removed = await deleteDocument(params.courseSlug, params.docId);
   if (!removed) {
     return NextResponse.json({ success: false, error: { code: 'document_not_found', message: 'Document not found.' } }, { status: 404 });
   }

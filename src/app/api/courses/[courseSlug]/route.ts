@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCourse, updateCourse, deleteCourse } from '@/lib/courses/store';
 import { deleteAllDocuments } from '@/lib/courseDocuments/store';
+import { requireAdmin } from '@/lib/auth/adminGuard';
 
 export const runtime = 'nodejs';
 
@@ -13,11 +14,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   course_not_found: 'Course not found.',
 };
 
-/**
- * Admin: rename a course. See /api/courses POST for the access-control note
- * (this project has no authentication system yet).
- */
+/** Admin: rename a course. */
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
+  const auth = requireAdmin(req);
+  if ('response' in auth) return auth.response;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -27,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 
   const title = typeof body === 'object' && body !== null && 'title' in body ? String((body as { title: unknown }).title ?? '') : '';
 
-  const result = updateCourse(params.courseSlug, title);
+  const result = await updateCourse(params.courseSlug, title);
   if ('error' in result) {
     const status = result.error === 'course_not_found' ? 404 : 400;
     return NextResponse.json({ success: false, error: { code: result.error, message: ERROR_MESSAGES[result.error] } }, { status });
@@ -37,14 +38,17 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 }
 
 /** Admin: delete a course and all of its documents. */
-export async function DELETE(_req: NextRequest, { params }: RouteParams) {
-  const course = getCourse(params.courseSlug);
+export async function DELETE(req: NextRequest, { params }: RouteParams) {
+  const auth = requireAdmin(req);
+  if ('response' in auth) return auth.response;
+
+  const course = await getCourse(params.courseSlug);
   if (!course) {
     return NextResponse.json({ success: false, error: { code: 'course_not_found', message: 'Course not found.' } }, { status: 404 });
   }
 
-  deleteAllDocuments(params.courseSlug);
-  deleteCourse(params.courseSlug);
+  await deleteAllDocuments(params.courseSlug);
+  await deleteCourse(params.courseSlug);
 
   return NextResponse.json({ success: true });
 }

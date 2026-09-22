@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, integer, timestamp, primaryKey, jsonb } from 'drizzle-orm/pg-core';
 
 /**
  * Drizzle schema — source of truth for the Postgres schema, migrated with
@@ -41,3 +41,74 @@ export const enrollments = pgTable(
     pk: primaryKey({ columns: [table.userId, table.courseSlug] }),
   })
 );
+
+export const courses = pgTable('courses', {
+  slug: varchar('slug', { length: 100 }).primaryKey(),
+  title: varchar('title', { length: 300 }).notNull(),
+});
+
+export const modules = pgTable('modules', {
+  id: uuid('id').primaryKey(),
+  courseSlug: varchar('course_slug', { length: 100 })
+    .notNull()
+    .references(() => courses.slug, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 300 }).notNull(),
+  order: integer('order').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const courseDocuments = pgTable('course_documents', {
+  id: uuid('id').primaryKey(),
+  courseSlug: varchar('course_slug', { length: 100 })
+    .notNull()
+    .references(() => courses.slug, { onDelete: 'cascade' }),
+  moduleId: uuid('module_id').references(() => modules.id, { onDelete: 'set null' }),
+  title: varchar('title', { length: 300 }).notNull(),
+  filename: varchar('filename', { length: 300 }).notNull(),
+  mimeType: varchar('mime_type', { length: 150 }).notNull(),
+  // Base64-encoded raw file bytes — same representation the in-memory
+  // store used, now durable. `text` rather than `bytea` keeps the store
+  // code (and the base64 encode/decode call sites) unchanged.
+  data: text('data').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  uploadedAt: timestamp('uploaded_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const assessments = pgTable('assessments', {
+  id: uuid('id').primaryKey(),
+  moduleId: uuid('module_id')
+    .notNull()
+    .unique()
+    .references(() => modules.id, { onDelete: 'cascade' }),
+  courseSlug: varchar('course_slug', { length: 100 }).notNull(),
+  title: varchar('title', { length: 300 }).notNull(),
+  instructions: text('instructions').notNull(),
+  rubric: text('rubric').notNull().default(''),
+  maxScore: integer('max_score').notNull().default(100),
+  allowedFormats: jsonb('allowed_formats').$type<string[]>().notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('active'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const submissions = pgTable('submissions', {
+  id: uuid('id').primaryKey(),
+  assessmentId: uuid('assessment_id')
+    .notNull()
+    .references(() => assessments.id, { onDelete: 'cascade' }),
+  moduleId: uuid('module_id').notNull(),
+  courseSlug: varchar('course_slug', { length: 100 }).notNull(),
+  studentId: uuid('student_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  filename: varchar('filename', { length: 300 }).notNull(),
+  mimeType: varchar('mime_type', { length: 150 }).notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
+  status: varchar('status', { length: 20 }).notNull().default('evaluating'),
+  // The full structured Gemini evaluation result (see src/lib/assessment/schema.ts),
+  // stored alongside the submission it belongs to rather than a separate table —
+  // it's always read/written together with its submission, never independently.
+  evaluation: jsonb('evaluation'),
+});

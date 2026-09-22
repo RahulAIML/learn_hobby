@@ -1,21 +1,45 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET as listModulesGET, POST as createModulePOST } from '@/app/api/courses/[courseSlug]/modules/route';
 import { DELETE as deleteModuleDELETE } from '@/app/api/courses/[courseSlug]/modules/[moduleId]/route';
 import { GET as assessmentGET, PUT as assessmentPUT, DELETE as assessmentDELETE } from '@/app/api/courses/[courseSlug]/modules/[moduleId]/assessment/route';
+import { createCourse } from '@/lib/courses/store';
+import { createAdminCookie } from '../helpers/adminAuth';
 
 const COURSE = 'data-science';
+
+let adminCookie: string;
+
+beforeAll(async () => {
+  await createCourse('Data Science');
+  adminCookie = await createAdminCookie();
+});
 
 function jsonRequest(url: string, method: string, body?: unknown): NextRequest {
   return new NextRequest(url, {
     method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), cookie: adminCookie },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
 
 describe('modules API', () => {
-  it('lists the seeded demo module', async () => {
+  it('rejects module creation from a non-admin/unauthenticated caller', async () => {
+    const res = await createModulePOST(
+      new NextRequest(`http://localhost/api/courses/${COURSE}/modules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'No Auth Module' }),
+      }),
+      { params: { courseSlug: COURSE } }
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('lists a created module', async () => {
+    await createModulePOST(jsonRequest(`http://localhost/api/courses/${COURSE}/modules`, 'POST', { title: 'Module 1: Intro' }), {
+      params: { courseSlug: COURSE },
+    });
     const res = await listModulesGET(jsonRequest(`http://localhost/api/courses/${COURSE}/modules`, 'GET'), { params: { courseSlug: COURSE } });
     const body = await res.json();
     expect(res.status).toBe(200);

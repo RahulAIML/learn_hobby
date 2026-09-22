@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     return errorResponse('unauthenticated', 'Please sign in to submit an assessment.', 401);
   }
 
-  const assessment = getAssessmentById(params.assessmentId);
+  const assessment = await getAssessmentById(params.assessmentId);
   if (!assessment || assessment.status !== 'active') {
     return errorResponse('assessment_not_found', 'Assessment not found.', 404);
   }
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     return errorResponse('file_too_large', `File exceeds the ${maxMb} MB limit.`, 413);
   }
 
-  const submission = createSubmission({
+  const submission = await createSubmission({
     assessmentId: assessment.id,
     moduleId: assessment.moduleId,
     courseSlug: assessment.courseSlug,
@@ -93,10 +93,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       rubric: assessment.rubric,
     });
 
-    saveEvaluation(submission.id, evaluation);
+    await saveEvaluation(submission.id, evaluation);
     return NextResponse.json({ success: true, submissionId: submission.id, evaluation }, { status: 201 });
   } catch (err) {
-    markFailed(submission.id);
+    await markFailed(submission.id);
     if (err instanceof AssessmentServiceError) {
       return errorResponse(err.code, err.message, err.status);
     }
@@ -112,7 +112,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     return errorResponse('unauthenticated', 'Please sign in.', 401);
   }
 
-  const assessment = getAssessmentById(params.assessmentId);
+  const assessment = await getAssessmentById(params.assessmentId);
   if (!assessment) {
     return errorResponse('assessment_not_found', 'Assessment not found.', 404);
   }
@@ -121,6 +121,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     return errorResponse('forbidden', 'You are not enrolled in this course.', 403);
   }
 
-  const submissions = listSubmissionsForStudent(assessment.id, user.id);
+  const submissions = await listSubmissionsForStudent(assessment.id, user.id);
   return NextResponse.json({ success: true, submissions });
 }

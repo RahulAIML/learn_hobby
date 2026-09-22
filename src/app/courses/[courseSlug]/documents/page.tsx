@@ -6,19 +6,15 @@ import { ShieldAlert, LogIn } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { CourseDocumentList } from '@/components/courses/CourseDocumentList';
-import { getCourse, courses } from '@/data/courses';
+import { getCourse } from '@/data/courses';
 import { SESSION_COOKIE, getSessionUserFromCookieValue } from '@/lib/auth/session';
 
 interface Props {
   params: { courseSlug: string };
 }
 
-export function generateStaticParams() {
-  return courses.map((c) => ({ courseSlug: c.slug }));
-}
-
-export function generateMetadata({ params }: Props) {
-  const course = getCourse(params.courseSlug);
+export async function generateMetadata({ params }: Props) {
+  const course = await getCourse(params.courseSlug);
   return {
     title: course ? `${course.title} — Documents | Gurukul` : 'Course Documents | Gurukul',
   };
@@ -45,8 +41,8 @@ function GateMessage({ icon: Icon, title, message, showLogin }: { icon: typeof S
   );
 }
 
-export default function CourseDocumentsPage({ params }: Props) {
-  const course = getCourse(params.courseSlug);
+export default async function CourseDocumentsPage({ params }: Props) {
+  const course = await getCourse(params.courseSlug);
   if (!course) notFound();
 
   const token = cookies().get(SESSION_COOKIE)?.value;
