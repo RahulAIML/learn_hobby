@@ -10,6 +10,11 @@ export interface User {
   phoneNo: string | null;
   role: UserRole;
   lastLoginAt: string | null;
+  age: number | null;
+  goalCategory: string | null;
+  goalSubcategory: string | null;
+  goalOption: string | null;
+  profileCompletedAt: string | null;
   createdAt: string;
 }
 
@@ -21,6 +26,11 @@ export interface PublicUser {
   mobile: string | null;
   phoneNo: string | null;
   role: UserRole;
+  age: number | null;
+  goalCategory: string | null;
+  goalSubcategory: string | null;
+  goalOption: string | null;
+  profileCompletedAt: string | null;
 }
 
 export function toPublicUser(user: User): PublicUser {
@@ -32,6 +42,11 @@ export function toPublicUser(user: User): PublicUser {
     mobile: user.mobile,
     phoneNo: user.phoneNo,
     role: user.role,
+    age: user.age,
+    goalCategory: user.goalCategory,
+    goalSubcategory: user.goalSubcategory,
+    goalOption: user.goalOption,
+    profileCompletedAt: user.profileCompletedAt,
   };
 }
 

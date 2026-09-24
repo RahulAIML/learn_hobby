@@ -23,6 +23,11 @@ function rowToUser(row: typeof users.$inferSelect): User {
     phoneNo: row.phoneNo,
     role: row.role as UserRole,
     lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
+    age: row.age,
+    goalCategory: row.goalCategory,
+    goalSubcategory: row.goalSubcategory,
+    goalOption: row.goalOption,
+    profileCompletedAt: row.profileCompletedAt ? row.profileCompletedAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -180,6 +185,47 @@ export async function updateUser(id: string, input: UpdateUserInput): Promise<{ 
       if (!PHONE_RE.test(phoneNo)) return { error: 'invalid_mobile' };
       patch.phoneNo = phoneNo;
     }
+  }
+
+  const [row] = await db.update(users).set(patch).where(eq(users.id, id)).returning();
+  if (!row) return { error: 'user_not_found' };
+
+  return { user: rowToUser(row) };
+}
+
+export interface UpdateProfileInput {
+  name?: string;
+  mobile?: string | null;
+  age?: number;
+  goalCategory?: string;
+  goalSubcategory?: string;
+  goalOption?: string;
+}
+
+/**
+ * Onboarding/profile-completion update (age + drill-down goal), distinct
+ * from updateUser (contact-detail edits) so the "profile completed" flag is
+ * only ever set here, from validated onboarding input.
+ */
+export async function updateProfile(id: string, input: UpdateProfileInput): Promise<{ user: User } | { error: 'user_not_found' }> {
+  const db = await getDb();
+
+  const patch: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
+  if (input.name !== undefined) patch.name = input.name.trim();
+  if (input.mobile !== undefined) patch.mobile = input.mobile === null ? null : normalizePhone(input.mobile);
+  if (input.age !== undefined) patch.age = input.age;
+  if (input.goalCategory !== undefined) patch.goalCategory = input.goalCategory;
+  if (input.goalSubcategory !== undefined) patch.goalSubcategory = input.goalSubcategory;
+  if (input.goalOption !== undefined) patch.goalOption = input.goalOption;
+
+  // Profile counts as "completed" once both age and a full goal selection exist —
+  // check the resulting state (existing value or the value being set right now).
+  const existing = await getUserById(id);
+  if (!existing) return { error: 'user_not_found' };
+  const resultingAge = input.age ?? existing.age;
+  const resultingGoal = input.goalOption ?? existing.goalOption;
+  if (resultingAge !== null && resultingAge !== undefined && resultingGoal) {
+    patch.profileCompletedAt = existing.profileCompletedAt ? new Date(existing.profileCompletedAt) : new Date();
   }
 
   const [row] = await db.update(users).set(patch).where(eq(users.id, id)).returning();

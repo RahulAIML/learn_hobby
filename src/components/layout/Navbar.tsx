@@ -266,6 +266,16 @@ export const Navbar: React.FC<NavbarProps> = ({ variant = 'light' }) => {
                       <LayoutDashboard className="w-4 h-4" />
                       {user.role === 'admin' ? 'Admin Dashboard' : 'My Courses'}
                     </Link>
+                    {user.role === 'student' && (
+                      <Link
+                        href="/dashboard"
+                        onClick={() => setAccountMenuOpen(false)}
+                        className="flex items-center gap-2 p-2.5 rounded-lg text-sm font-semibold hover:bg-red-50 hover:text-red-700 transition-colors"
+                      >
+                        <LayoutDashboard className="w-4 h-4" />
+                        My Performance
+                      </Link>
+                    )}
                     <button
                       type="button"
                       onClick={handleLogout}
@@ -412,6 +422,17 @@ export const Navbar: React.FC<NavbarProps> = ({ variant = 'light' }) => {
                 >
                   {user.role === 'admin' ? 'Admin Dashboard' : 'My Courses'}
                 </Link>
+                {user.role === 'student' && (
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`w-full py-2.5 text-center text-sm font-semibold rounded-lg border ${
+                      isDark ? 'border-slate-700 text-white' : 'border-slate-300 text-slate-700'
+                    }`}
+                  >
+                    My Performance
+                  </Link>
+                )}
                 <button
                   type="button"
                   onClick={() => {

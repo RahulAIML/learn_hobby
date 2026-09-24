@@ -36,6 +36,13 @@
       "when": 1790200000000,
       "tag": "0004_cbt_assessment_system",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790270315578,
+      "tag": "0005_add_student_profile_fields",
+      "breakpoints": true
     }
   ]
 }

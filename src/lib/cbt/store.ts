@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, ne } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { cbtAnswers, cbtAssessments, cbtAttempts, cbtQuestionOptions, cbtQuestions } from '@/lib/db/schema';
 import type { CbtAssessmentInput, CbtQuestionInput, CbtAssessmentStatus, StudentQuestion } from './types';
@@ -66,5 +66,55 @@ export async function getAttemptResult(attemptId: string) {
     })),
   };
 }
+/**
+ * Every attempt a student has ever submitted/expired (in_progress attempts
+ * excluded — they have no score yet), newest first, joined with its
+ * assessment for display. This is the "many attempts, never overwritten"
+ * read path: each row is a distinct cbt_attempts.id, so retaking an
+ * assessment adds a row here rather than replacing one.
+ */
+export async function listAttemptsByStudent(studentId: string) {
+  const db = await getDb();
+  const rows = await db
+    .select({ attempt: cbtAttempts, assessment: cbtAssessments })
+    .from(cbtAttempts)
+    .innerJoin(cbtAssessments, eq(cbtAttempts.assessmentId, cbtAssessments.id))
+    .where(and(eq(cbtAttempts.studentId, studentId), ne(cbtAttempts.status, 'in_progress')))
+    .orderBy(desc(cbtAttempts.submittedAt));
+  return rows;
+}
+
+/** Aggregate stats computed from real attempt rows — never hardcoded or cached separately from them. */
+export async function getStudentPerformanceSummary(studentId: string) {
+  const attempts = await listAttemptsByStudent(studentId);
+  const scored = attempts.filter((row) => row.attempt.percentage !== null);
+  const totalAttempts = attempts.length;
+  const averagePercentage = scored.length ? Math.round(scored.reduce((sum, row) => sum + (row.attempt.percentage ?? 0), 0) / scored.length) : null;
+  const bestPercentage = scored.length ? Math.max(...scored.map((row) => row.attempt.percentage ?? 0)) : null;
+  const latest = attempts[0] ?? null;
+
+  const topicTotals = new Map<string, { correct: number; total: number }>();
+  for (const row of scored) {
+    const topic = row.assessment.topic;
+    const entry = topicTotals.get(topic) ?? { correct: 0, total: 0 };
+    entry.correct += row.attempt.score ?? 0;
+    entry.total += row.attempt.maxScore ?? 0;
+    topicTotals.set(topic, entry);
+  }
+  const topicPerformance = Array.from(topicTotals.entries()).map(([topic, { correct, total }]) => ({
+    topic,
+    percentage: total ? Math.round((correct / total) * 100) : 0,
+  }));
+
+  return {
+    totalAttempts,
+    completedAttempts: scored.length,
+    averagePercentage,
+    bestPercentage,
+    latestAttempt: latest,
+    topicPerformance,
+  };
+}
+
 function normalize(value:string){return value.trim().toLocaleLowerCase().replace(/\s+/g,' ');}
 export async function submitAttempt(attemptId:string) { const attempt=await getAttempt(attemptId); if(!attempt) return null; if(attempt.status!=='in_progress') return attempt; const assessment=await getCbtAssessment(attempt.assessmentId); if(!assessment)return null; const now=new Date(); const elapsed=Math.floor((now.getTime()-attempt.startedAt.getTime())/1000); const expired=elapsed>=assessment.timeLimitMinutes*60; const questions=await listAdminQuestions(assessment.id); const answers=await listAttemptAnswers(attemptId); const db=await getDb(); let score=0; for(const question of questions){const answer=answers.find(item=>item.questionId===question.id); const submitted=answer?.answer??null; const isCorrect=!!submitted && (question.type==='mcq'?submitted===question.correctAnswer:[question.correctAnswer,...(question.acceptableAnswers??[])].some(value=>normalize(value)===normalize(submitted))); if(answer) await db.update(cbtAnswers).set({isCorrect:isCorrect?1:0,marksAwarded:isCorrect?1:0,updatedAt:now}).where(eq(cbtAnswers.id,answer.id)); if(isCorrect)score++;} const [saved]=await db.update(cbtAttempts).set({status:expired?'expired':'submitted',submittedAt:now,score,maxScore:questions.length,percentage:questions.length?Math.round(score/questions.length*100):0,timeTakenSeconds:Math.min(elapsed,assessment.timeLimitMinutes*60)}).where(eq(cbtAttempts.id,attemptId)).returning(); return saved; }

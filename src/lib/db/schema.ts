@@ -25,6 +25,16 @@ export const users = pgTable('users', {
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
   role: varchar('role', { length: 20 }).notNull().default('student'),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  // Onboarding fields (age + drill-down goal selection). Nullable: not
+  // collected at signup, filled in during the post-login profile-completion
+  // step. goalCategory/goalSubcategory/goalOption store the full drill-down
+  // path (see src/lib/profile/goalTaxonomy.ts) rather than a single free-text
+  // string, so future personalization features can query by category.
+  age: integer('age'),
+  goalCategory: varchar('goal_category', { length: 100 }),
+  goalSubcategory: varchar('goal_subcategory', { length: 100 }),
+  goalOption: varchar('goal_option', { length: 150 }),
+  profileCompletedAt: timestamp('profile_completed_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

@@ -150,6 +150,9 @@ export const AdminDashboard: React.FC = () => {
           <Link href="/admin/cbt" className="text-xs font-bold text-slate-500 hover:text-red-700 transition-colors">
             CBT Assessments →
           </Link>
+          <Link href="/admin/students" className="text-xs font-bold text-slate-500 hover:text-red-700 transition-colors">
+            Students →
+          </Link>
           <Link href="/admin/users" className="text-xs font-bold text-slate-500 hover:text-red-700 transition-colors">
             Registered Users →
           </Link>

@@ -53,6 +53,11 @@ async function createTestConnection(): Promise<DrizzleDb> {
       password_hash varchar(255) NOT NULL,
       role varchar(20) NOT NULL DEFAULT 'student',
       last_login_at timestamptz,
+      age integer,
+      goal_category varchar(100),
+      goal_subcategory varchar(100),
+      goal_option varchar(150),
+      profile_completed_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     )
