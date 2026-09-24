@@ -9,7 +9,7 @@ import { ModulePage } from '@/components/courses/ModulePage';
 import { getCourse } from '@/data/courses';
 import { getModule } from '@/lib/modules/store';
 import { getAssessmentByModule } from '@/lib/assessments/store';
-import { getPublishedCbtAssessmentByModule } from '@/lib/cbt/store';
+import { listPublishedCbtAssessmentsByModule, listAttemptsByStudent } from '@/lib/cbt/store';
 import { SESSION_COOKIE, getSessionUserFromCookieValue } from '@/lib/auth/session';
 
 interface Props {
@@ -59,7 +59,20 @@ export default async function CourseModulePage({ params }: Props) {
   }
 
   const assessment = await getAssessmentByModule(mod.id);
-  const cbtAssessment = await getPublishedCbtAssessmentByModule(mod.id);
+  const cbtAssessments = await listPublishedCbtAssessmentsByModule(mod.id);
+
+  // Per-assessment attempt history for THIS student only, so the CTA can say
+  // "Retake" with their last score instead of always "Start" — computed from
+  // the student's own submitted attempts, never a client-supplied count.
+  const studentAttempts = user && user.role === 'student' ? await listAttemptsByStudent(user.id) : [];
+  const attemptsByAssessment = new Map<string, { count: number; lastPercentage: number | null; bestPercentage: number | null }>();
+  for (const { attempt, assessment: cbtAssessment } of studentAttempts) {
+    const existing = attemptsByAssessment.get(cbtAssessment.id) ?? { count: 0, lastPercentage: null, bestPercentage: null };
+    existing.count += 1;
+    if (existing.lastPercentage === null) existing.lastPercentage = attempt.percentage; // rows are newest-first
+    if (attempt.percentage !== null) existing.bestPercentage = Math.max(existing.bestPercentage ?? 0, attempt.percentage);
+    attemptsByAssessment.set(cbtAssessment.id, existing);
+  }
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -71,8 +84,13 @@ export default async function CourseModulePage({ params }: Props) {
             moduleId={mod.id}
             moduleTitle={mod.title}
             assessmentId={assessment && assessment.status === 'active' ? assessment.id : null}
-            cbtAssessmentId={cbtAssessment ? cbtAssessment.id : null}
-            cbtAssessmentTitle={cbtAssessment ? cbtAssessment.title : null}
+            cbtAssessments={cbtAssessments.map((a) => ({
+              id: a.id,
+              title: a.title,
+              topic: a.topic,
+              timeLimitMinutes: a.timeLimitMinutes,
+              attempts: attemptsByAssessment.get(a.id) ?? null,
+            }))}
           />
         )}
       </main>

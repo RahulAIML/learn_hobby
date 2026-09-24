@@ -6,13 +6,20 @@ import { FileText, Download, Eye, Loader2, AlertCircle, ArrowRight, ClipboardLis
 import { formatBytes } from '@/lib/assessment/fileValidation';
 import type { CourseDocumentSummary } from '@/lib/courseDocuments/types';
 
+interface CbtAssessmentSummary {
+  id: string;
+  title: string;
+  topic: string;
+  timeLimitMinutes: number;
+  attempts: { count: number; lastPercentage: number | null; bestPercentage: number | null } | null;
+}
+
 interface ModulePageProps {
   courseSlug: string;
   moduleId: string;
   moduleTitle: string;
   assessmentId: string | null;
-  cbtAssessmentId?: string | null;
-  cbtAssessmentTitle?: string | null;
+  cbtAssessments?: CbtAssessmentSummary[];
 }
 
 type ListState =
@@ -25,8 +32,7 @@ export const ModulePage: React.FC<ModulePageProps> = ({
   moduleId,
   moduleTitle,
   assessmentId,
-  cbtAssessmentId,
-  cbtAssessmentTitle,
+  cbtAssessments = [],
 }) => {
   const [state, setState] = useState<ListState>({ status: 'loading' });
 
@@ -124,20 +130,43 @@ export const ModulePage: React.FC<ModulePageProps> = ({
         </ul>
       )}
 
-      {cbtAssessmentId && (
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-5 sm:p-6">
-          <div>
-            <p className="text-sm font-bold text-white">{cbtAssessmentTitle ?? 'Timed CBT Assessment available'}</p>
-            <p className="text-xs text-slate-300 mt-0.5">Computer-based test with a live timer and instant scoring.</p>
-          </div>
-          <Link
-            href={`/cbt/${cbtAssessmentId}`}
-            className="flex-shrink-0 w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full text-sm font-bold text-slate-950 bg-white hover:bg-slate-100 shadow-lg transition-all duration-200"
-          >
-            <Timer className="w-4 h-4" />
-            <span>Start CBT Assessment</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+      {cbtAssessments.length > 0 && (
+        <div className="mt-8 space-y-3">
+          {cbtAssessments.length > 1 && (
+            <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+              CBT Assessments ({cbtAssessments.length})
+            </h2>
+          )}
+          {cbtAssessments.map((cbt) => {
+            const taken = !!cbt.attempts;
+            return (
+              <div
+                key={cbt.id}
+                className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-5 sm:p-6"
+              >
+                <div>
+                  <p className="text-sm font-bold text-white">{cbt.title}</p>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    {cbt.topic} &middot; {cbt.timeLimitMinutes} min &middot; live timer, instant scoring
+                  </p>
+                  {taken && (
+                    <p className="text-xs text-emerald-400 font-semibold mt-1.5">
+                      {cbt.attempts!.count} attempt{cbt.attempts!.count === 1 ? '' : 's'} &middot; Last: {cbt.attempts!.lastPercentage ?? '—'}%
+                      &middot; Best: {cbt.attempts!.bestPercentage ?? '—'}%
+                    </p>
+                  )}
+                </div>
+                <Link
+                  href={`/cbt/${cbt.id}`}
+                  className="flex-shrink-0 w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full text-sm font-bold text-slate-950 bg-white hover:bg-slate-100 shadow-lg transition-all duration-200"
+                >
+                  <Timer className="w-4 h-4" />
+                  <span>{taken ? 'Retake CBT Assessment' : 'Start CBT Assessment'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            );
+          })}
         </div>
       )}
 

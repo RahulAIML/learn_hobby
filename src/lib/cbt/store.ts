@@ -10,8 +10,19 @@ export async function createCbtAssessment(input: CbtAssessmentInput, createdBy: 
   return row;
 }
 export async function getCbtAssessment(id: string) { const db = await getDb(); const [row] = await db.select().from(cbtAssessments).where(eq(cbtAssessments.id, id)).limit(1); return row; }
-/** Used by the student module page to show a "Take CBT Assessment" link — only ever surfaces a published assessment. */
-export async function getPublishedCbtAssessmentByModule(moduleId: string) { const db = await getDb(); const [row] = await db.select().from(cbtAssessments).where(and(eq(cbtAssessments.moduleId, moduleId), eq(cbtAssessments.status, 'published'))).limit(1); return row; }
+/**
+ * Used by the student module page to list every CBT assessment available
+ * for that module — a module can have multiple published CBTs (e.g. one per
+ * sub-topic), and all of them must be shown, not just the first one found.
+ */
+export async function listPublishedCbtAssessmentsByModule(moduleId: string) {
+  const db = await getDb();
+  return db
+    .select()
+    .from(cbtAssessments)
+    .where(and(eq(cbtAssessments.moduleId, moduleId), eq(cbtAssessments.status, 'published')))
+    .orderBy(asc(cbtAssessments.createdAt));
+}
 export async function listCbtAssessments(courseSlug?: string) { const db=await getDb(); return courseSlug ? db.select().from(cbtAssessments).where(eq(cbtAssessments.courseSlug, courseSlug)).orderBy(asc(cbtAssessments.createdAt)) : db.select().from(cbtAssessments).orderBy(asc(cbtAssessments.createdAt)); }
 export async function updateCbtAssessment(id: string, values: Partial<CbtAssessmentInput> & { status?: CbtAssessmentStatus }) { const db=await getDb(); const [row]=await db.update(cbtAssessments).set({...values, updatedAt:new Date()}).where(eq(cbtAssessments.id,id)).returning(); return row; }
 export async function replaceQuestions(assessmentId: string, questions: CbtQuestionInput[]) {
