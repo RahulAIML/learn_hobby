@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Sparkles, Loader2, AlertCircle, ListChecks, ArrowRight } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, ListChecks, ArrowRight, Search } from 'lucide-react';
 
 interface Course {
   slug: string;
@@ -21,7 +21,11 @@ interface CbtAssessmentSummary {
   mcqCount: number;
   fillBlankCount: number;
   createdAt: string;
+  attempts: number;
+  avgPercentage: number | null;
 }
+
+type StatusFilter = 'all' | CbtAssessmentSummary['status'];
 
 const GENERATING_MESSAGES = ['Generating questions…', 'Checking accuracy…', 'Preparing assessment…'];
 
@@ -33,6 +37,8 @@ export const CbtAdminList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generatingStep, setGeneratingStep] = useState(0);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const [form, setForm] = useState({
     courseSlug: '',
@@ -112,6 +118,16 @@ export const CbtAdminList: React.FC = () => {
       setGenerating(false);
     }
   };
+
+  const filteredAssessments = useMemo(() => {
+    if (!assessments) return null;
+    const q = query.trim().toLowerCase();
+    return assessments.filter((a) => {
+      const matchesQuery = !q || a.title.toLowerCase().includes(q) || a.topic.toLowerCase().includes(q);
+      const matchesStatus = statusFilter === 'all' || a.status === statusFilter;
+      return matchesQuery && matchesStatus;
+    });
+  }, [assessments, query, statusFilter]);
 
   const statusBadge = (status: CbtAssessmentSummary['status']) => {
     const styles: Record<string, string> = {
@@ -293,6 +309,36 @@ export const CbtAdminList: React.FC = () => {
       )}
 
       <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider mt-10 mb-4">Existing Assessments</h2>
+
+      {assessments && assessments.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 mb-4">
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by title or topic…"
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-red-600/20"
+            />
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0 overflow-x-auto">
+            {(['all', 'draft', 'generated', 'published', 'archived'] as StatusFilter[]).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setStatusFilter(f)}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors capitalize whitespace-nowrap ${
+                  statusFilter === f ? 'bg-red-50 text-red-800 border-red-200' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {assessments === null ? (
         <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
           <Loader2 className="w-5 h-5 animate-spin" />
@@ -302,9 +348,14 @@ export const CbtAdminList: React.FC = () => {
           <ListChecks className="w-8 h-8 text-slate-300 mx-auto mb-3" />
           <p className="text-sm text-slate-500">No CBT assessments generated yet.</p>
         </div>
+      ) : filteredAssessments && filteredAssessments.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-8 text-center">
+          <Search className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+          <p className="text-sm text-slate-500">No assessments match your search.</p>
+        </div>
       ) : (
         <ul className="space-y-2">
-          {assessments.map((a) => (
+          {filteredAssessments!.map((a) => (
             <li key={a.id}>
               <Link
                 href={`/admin/cbt/${a.id}`}
@@ -316,7 +367,15 @@ export const CbtAdminList: React.FC = () => {
                     {a.topic} &middot; {a.mcqCount} MCQ + {a.fillBlankCount} Fill-in-Blank
                   </p>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-4 flex-shrink-0">
+                  <div className="text-right hidden sm:block">
+                    <p className="text-sm font-bold text-slate-900">{a.attempts}</p>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase">Attempts</p>
+                  </div>
+                  <div className="text-right hidden sm:block">
+                    <p className="text-sm font-bold text-slate-900">{a.avgPercentage !== null ? `${a.avgPercentage}%` : '—'}</p>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase">Avg</p>
+                  </div>
                   {statusBadge(a.status)}
                   <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-red-600 transition-colors" />
                 </div>

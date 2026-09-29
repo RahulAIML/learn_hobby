@@ -1,6 +1,7 @@
-import { and, desc, eq, ne, sql } from 'drizzle-orm';
+import { desc, eq, ne, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
 import { cbtAssessments, cbtAttempts, courses, submissions, users } from '@/lib/db/schema';
+import { getCbtAssessmentStats } from '@/lib/cbt/store';
 
 /**
  * Real platform aggregates for the admin dashboard — every number here is a
@@ -46,20 +47,8 @@ export async function getRecentCbtAssessments(limit = 5): Promise<RecentAssessme
   const assessments = await db.select().from(cbtAssessments).orderBy(desc(cbtAssessments.createdAt)).limit(limit);
   return Promise.all(
     assessments.map(async (assessment) => {
-      const attemptRows = await db
-        .select()
-        .from(cbtAttempts)
-        .where(and(eq(cbtAttempts.assessmentId, assessment.id), ne(cbtAttempts.status, 'in_progress')));
-      const scored = attemptRows.filter((a) => a.percentage !== null);
-      const avgPercentage = scored.length ? Math.round(scored.reduce((sum, a) => sum + (a.percentage ?? 0), 0) / scored.length) : null;
-      return {
-        id: assessment.id,
-        title: assessment.title,
-        topic: assessment.topic,
-        status: assessment.status,
-        attempts: attemptRows.length,
-        avgPercentage,
-      };
+      const stats = await getCbtAssessmentStats(assessment.id);
+      return { id: assessment.id, title: assessment.title, topic: assessment.topic, status: assessment.status, ...stats };
     })
   );
 }

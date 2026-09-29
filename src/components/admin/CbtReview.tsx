@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Loader2,
   AlertCircle,
@@ -12,6 +13,11 @@ import {
   ArrowLeft,
   Rocket,
   X,
+  Archive,
+  ArchiveRestore,
+  Users,
+  ListChecks,
+  Target,
 } from 'lucide-react';
 
 interface QuestionOption {
@@ -43,6 +49,26 @@ interface Assessment {
   mcqCount: number;
   fillBlankCount: number;
   optionsPerMcq: number;
+}
+interface AttemptRow {
+  attemptId: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  status: string;
+  score: number | null;
+  maxScore: number | null;
+  percentage: number | null;
+  submittedAt: string | null;
+}
+interface AssessmentStats {
+  attempts: number;
+  avgPercentage: number | null;
+}
+
+function formatDate(value: string | null): string {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 type FormState = {
@@ -86,15 +112,20 @@ function questionToForm(q: Question): FormState {
 }
 
 export const CbtReview: React.FC<{ assessmentId: string }> = ({ assessmentId }) => {
+  const router = useRouter();
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [questions, setQuestions] = useState<Question[] | null>(null);
+  const [stats, setStats] = useState<AssessmentStats | null>(null);
+  const [attempts, setAttempts] = useState<AttemptRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
-  const [published, setPublished] = useState(false);
   const [editing, setEditing] = useState<Question | 'new' | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/admin/cbt-assessments/${assessmentId}`);
@@ -105,12 +136,59 @@ export const CbtReview: React.FC<{ assessmentId: string }> = ({ assessmentId }) 
     }
     setAssessment(body.assessment);
     setQuestions(body.questions);
-    setPublished(body.assessment.status === 'published');
+    setStats(body.stats);
+    setAttempts(body.attempts);
   }, [assessmentId]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleArchive = async () => {
+    setStatusBusy(true);
+    setStatusError(null);
+    try {
+      const res = await fetch(`/api/admin/cbt-assessments/${assessmentId}/archive`, { method: 'POST' });
+      const body = await res.json();
+      if (!res.ok || !body.success) throw new Error(body?.error?.message ?? 'Could not archive assessment.');
+      await load();
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : 'Could not archive assessment.');
+    } finally {
+      setStatusBusy(false);
+    }
+  };
+
+  const handleUnarchive = async () => {
+    setStatusBusy(true);
+    setStatusError(null);
+    try {
+      const res = await fetch(`/api/admin/cbt-assessments/${assessmentId}/unarchive`, { method: 'POST' });
+      const body = await res.json();
+      if (!res.ok || !body.success) throw new Error(body?.error?.message ?? 'Could not unarchive assessment.');
+      await load();
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : 'Could not unarchive assessment.');
+    } finally {
+      setStatusBusy(false);
+    }
+  };
+
+  const handleDeleteAssessment = async () => {
+    if (!assessment) return;
+    if (!confirm(`Permanently delete "${assessment.title}"? This removes every recorded attempt and cannot be undone.`)) return;
+    setDeleting(true);
+    setStatusError(null);
+    try {
+      const res = await fetch(`/api/admin/cbt-assessments/${assessmentId}`, { method: 'DELETE' });
+      const body = await res.json();
+      if (!res.ok || !body.success) throw new Error(body?.error?.message ?? 'Could not delete assessment.');
+      router.push('/admin/cbt');
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : 'Could not delete assessment.');
+      setDeleting(false);
+    }
+  };
 
   const openEdit = (q: Question) => {
     setEditing(q);
@@ -179,7 +257,6 @@ export const CbtReview: React.FC<{ assessmentId: string }> = ({ assessmentId }) 
       const res = await fetch(`/api/admin/cbt-assessments/${assessmentId}/publish`, { method: 'POST' });
       const body = await res.json();
       if (!res.ok || !body.success) throw new Error(body?.error?.message ?? 'Could not publish.');
-      setPublished(true);
       setAssessment(body.assessment);
     } catch (err) {
       setPublishError(err instanceof Error ? err.message : 'Could not publish.');
@@ -207,6 +284,7 @@ export const CbtReview: React.FC<{ assessmentId: string }> = ({ assessmentId }) 
 
   const expectedTotal = assessment.mcqCount + assessment.fillBlankCount;
   const readyToPublish = questions.length === expectedTotal;
+  const canEditQuestions = assessment.status === 'draft' || assessment.status === 'generated';
 
   return (
     <div>
@@ -222,17 +300,80 @@ export const CbtReview: React.FC<{ assessmentId: string }> = ({ assessmentId }) 
             {assessment.topic} &middot; {assessment.difficulty} &middot; {assessment.timeLimitMinutes} min
           </p>
         </div>
-        {published ? (
-          <span className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Published
-          </span>
-        ) : (
-          <span className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100">
-            {assessment.status}
-          </span>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {assessment.status === 'published' && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Published
+            </span>
+          )}
+          {assessment.status === 'archived' && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500">
+              <Archive className="w-3.5 h-3.5" />
+              Archived
+            </span>
+          )}
+          {(assessment.status === 'draft' || assessment.status === 'generated') && (
+            <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100">{assessment.status}</span>
+          )}
+        </div>
       </div>
+
+      <div className="flex items-center gap-2 mt-3">
+        {assessment.status === 'published' && (
+          <button
+            type="button"
+            disabled={statusBusy}
+            onClick={handleArchive}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-700 transition-colors disabled:opacity-50"
+          >
+            {statusBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Archive className="w-3.5 h-3.5" />}
+            Archive
+          </button>
+        )}
+        {assessment.status === 'archived' && (
+          <button
+            type="button"
+            disabled={statusBusy}
+            onClick={handleUnarchive}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border border-slate-200 text-slate-600 hover:border-green-300 hover:text-green-700 transition-colors disabled:opacity-50"
+          >
+            {statusBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArchiveRestore className="w-3.5 h-3.5" />}
+            Unarchive
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={deleting}
+          onClick={handleDeleteAssessment}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border border-red-200 text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+          Delete
+        </button>
+      </div>
+
+      {statusError && (
+        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 mt-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-900">{statusError}</p>
+        </div>
+      )}
+
+      {stats && (
+        <div className="grid grid-cols-2 gap-3 mt-4 max-w-md">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <Users className="w-4 h-4 text-slate-400 mb-2" />
+            <p className="text-xl font-black text-slate-900">{stats.attempts}</p>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Attempts</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <Target className="w-4 h-4 text-slate-400 mb-2" />
+            <p className="text-xl font-black text-slate-900">{stats.avgPercentage !== null ? `${stats.avgPercentage}%` : '—'}</p>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Avg. Score</p>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-xs text-slate-600">
         Requires exactly <strong>{expectedTotal}</strong> questions to publish ({assessment.mcqCount} MCQ + {assessment.fillBlankCount} fill-in-blank). Currently{' '}
@@ -246,7 +387,7 @@ export const CbtReview: React.FC<{ assessmentId: string }> = ({ assessmentId }) 
         </div>
       )}
 
-      {!published && (
+      {(assessment.status === 'draft' || assessment.status === 'generated') && (
         <button
           type="button"
           onClick={handlePublish}
@@ -260,7 +401,7 @@ export const CbtReview: React.FC<{ assessmentId: string }> = ({ assessmentId }) 
 
       <div className="flex items-center justify-between mt-10 mb-4">
         <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Questions ({questions.length})</h2>
-        {!published && (
+        {canEditQuestions && (
           <button
             type="button"
             onClick={openNew}
@@ -299,7 +440,7 @@ export const CbtReview: React.FC<{ assessmentId: string }> = ({ assessmentId }) 
                   <p className="text-xs text-green-700 font-semibold mt-2">Answer: {q.correctAnswer}</p>
                 )}
               </div>
-              {!published && (
+              {canEditQuestions && (
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button
                     type="button"
@@ -321,6 +462,42 @@ export const CbtReview: React.FC<{ assessmentId: string }> = ({ assessmentId }) 
           </div>
         ))}
       </div>
+
+      <h2 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider mt-10 mb-4">
+        Attempts {attempts ? `(${attempts.length})` : ''}
+      </h2>
+      {!attempts ? (
+        <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
+          <Loader2 className="w-5 h-5 animate-spin" />
+        </div>
+      ) : attempts.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-8 text-center">
+          <ListChecks className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+          <p className="text-sm text-slate-500">No students have attempted this assessment yet.</p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {attempts.map((a) => (
+            <li key={a.attemptId}>
+              <Link
+                href={`/cbt/results/${a.attemptId}`}
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-red-300 transition-colors group"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900 truncate">{a.studentName}</p>
+                  <p className="text-xs text-slate-500 truncate">
+                    {a.studentEmail} &middot; {formatDate(a.submittedAt)}
+                    {a.status === 'expired' && <span className="text-amber-600 font-semibold"> (auto-submitted)</span>}
+                  </p>
+                </div>
+                <span className="text-lg font-black text-slate-900 flex-shrink-0">
+                  {a.percentage !== null ? `${a.percentage}%` : '—'}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {editing && form && (
         <div className="fixed inset-0 bg-slate-950/40 flex items-center justify-center p-4 z-50" onClick={closeEdit}>

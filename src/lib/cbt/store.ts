@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { and, asc, desc, eq, ne } from 'drizzle-orm';
 import { getDb } from '@/lib/db/client';
-import { cbtAnswers, cbtAssessments, cbtAttempts, cbtQuestionOptions, cbtQuestions } from '@/lib/db/schema';
+import { cbtAnswers, cbtAssessments, cbtAttempts, cbtQuestionOptions, cbtQuestions, users } from '@/lib/db/schema';
 import type { CbtAssessmentInput, CbtQuestionInput, CbtAssessmentStatus, StudentQuestion } from './types';
 
 export async function createCbtAssessment(input: CbtAssessmentInput, createdBy: string, status: CbtAssessmentStatus = 'draft') {
@@ -25,6 +25,36 @@ export async function listPublishedCbtAssessmentsByModule(moduleId: string) {
 }
 export async function listCbtAssessments(courseSlug?: string) { const db=await getDb(); return courseSlug ? db.select().from(cbtAssessments).where(eq(cbtAssessments.courseSlug, courseSlug)).orderBy(asc(cbtAssessments.createdAt)) : db.select().from(cbtAssessments).orderBy(asc(cbtAssessments.createdAt)); }
 export async function updateCbtAssessment(id: string, values: Partial<CbtAssessmentInput> & { status?: CbtAssessmentStatus }) { const db=await getDb(); const [row]=await db.update(cbtAssessments).set({...values, updatedAt:new Date()}).where(eq(cbtAssessments.id,id)).returning(); return row; }
+/** Cascades to cbt_questions/cbt_question_options/cbt_attempts/cbt_answers via FK ON DELETE CASCADE — deleting an assessment removes every real attempt/answer that was ever recorded against it. */
+export async function deleteCbtAssessment(id: string): Promise<boolean> { const db=await getDb(); return (await db.delete(cbtAssessments).where(eq(cbtAssessments.id,id)).returning()).length>0; }
+/** Real attempt count + average score for one assessment — never cached/hardcoded, used by both the admin list and detail views. */
+export async function getCbtAssessmentStats(assessmentId: string): Promise<{ attempts: number; avgPercentage: number | null }> {
+  const db = await getDb();
+  const rows = await db.select().from(cbtAttempts).where(and(eq(cbtAttempts.assessmentId, assessmentId), ne(cbtAttempts.status, 'in_progress')));
+  const scored = rows.filter((r) => r.percentage !== null);
+  return { attempts: rows.length, avgPercentage: scored.length ? Math.round(scored.reduce((sum, r) => sum + (r.percentage ?? 0), 0) / scored.length) : null };
+}
+/** Every real attempt against one assessment, newest first, with the student's name/email — the "who took this" view for admins. */
+export async function listAttemptsByAssessment(assessmentId: string) {
+  const db = await getDb();
+  const rows = await db
+    .select({ attempt: cbtAttempts, studentName: users.name, studentEmail: users.email })
+    .from(cbtAttempts)
+    .innerJoin(users, eq(cbtAttempts.studentId, users.id))
+    .where(and(eq(cbtAttempts.assessmentId, assessmentId), ne(cbtAttempts.status, 'in_progress')))
+    .orderBy(desc(cbtAttempts.submittedAt));
+  return rows.map((r) => ({
+    attemptId: r.attempt.id,
+    studentId: r.attempt.studentId,
+    studentName: r.studentName,
+    studentEmail: r.studentEmail,
+    status: r.attempt.status,
+    score: r.attempt.score,
+    maxScore: r.attempt.maxScore,
+    percentage: r.attempt.percentage,
+    submittedAt: r.attempt.submittedAt,
+  }));
+}
 export async function replaceQuestions(assessmentId: string, questions: CbtQuestionInput[]) {
   const db=await getDb(); await db.delete(cbtQuestions).where(eq(cbtQuestions.assessmentId, assessmentId));
   for (const item of questions) await addQuestion(assessmentId, item);

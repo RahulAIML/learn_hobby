@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 
   const attempt = await getAttempt(params.id);
-  if (!attempt || attempt.studentId !== user.id) {
+  if (!attempt || (attempt.studentId !== user.id && user.role !== 'admin')) {
     return NextResponse.json({ success: false, error: { code: 'not_found', message: 'Attempt not found.' } }, { status: 404 });
   }
 
