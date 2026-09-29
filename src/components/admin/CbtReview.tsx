@@ -209,7 +209,7 @@ export const CbtReview: React.FC<{ assessmentId: string }> = ({ assessmentId }) 
   const readyToPublish = questions.length === expectedTotal;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+    <div>
       <Link href="/admin/cbt" className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-red-700 mb-4">
         <ArrowLeft className="w-3.5 h-3.5" />
         Back to Assessments

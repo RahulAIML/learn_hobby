@@ -1,16 +1,16 @@
 import React from 'react';
 import { cookies } from 'next/headers';
 import { AdminLayout } from '@/components/admin/layout/AdminLayout';
-import { CbtAdminList } from '@/components/admin/CbtAdminList';
+import { ComingSoon } from '@/components/admin/ui/ComingSoon';
 import { getAdminGate } from '@/components/admin/ui/AdminGate';
 import { SESSION_COOKIE, getSessionUserFromCookieValue } from '@/lib/auth/session';
 
 export const metadata = {
-  title: 'CBT Assessments | Gurukul Admin',
+  title: 'Settings | Gurukul Admin',
   robots: { index: false, follow: false },
 };
 
-export default function AdminCbtPage() {
+export default function AdminSettingsPage() {
   const token = cookies().get(SESSION_COOKIE)?.value;
   const user = getSessionUserFromCookieValue(token);
 
@@ -18,8 +18,11 @@ export default function AdminCbtPage() {
   if (gate) return gate;
 
   return (
-    <AdminLayout active="assessments" breadcrumbs={[{ label: 'Dashboard', href: '/admin' }, { label: 'Assessments' }]}>
-      <CbtAdminList />
+    <AdminLayout active="settings" breadcrumbs={[{ label: 'Dashboard', href: '/admin' }, { label: 'Settings' }]}>
+      <ComingSoon
+        title="Platform settings are coming soon"
+        description="Configuration for CBT defaults, branding, and platform-wide options lands in a future update."
+      />
     </AdminLayout>
   );
 }

@@ -52,7 +52,7 @@ export const AdminUsersList: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+    <div>
       <div className="flex items-center gap-2 mb-1.5">
         <UsersIcon className="w-4 h-4 text-red-600" />
         <span className="text-xs font-extrabold text-red-600 uppercase tracking-wider">Admin</span>
