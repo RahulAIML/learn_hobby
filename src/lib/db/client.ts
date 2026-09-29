@@ -77,6 +77,18 @@ async function createTestConnection(): Promise<DrizzleDb> {
     )
   `);
   await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS paid_users (
+      user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      plan varchar(50) NOT NULL DEFAULT 'standard',
+      amount integer,
+      currency varchar(10),
+      activated_by uuid REFERENCES users(id) ON DELETE SET NULL,
+      notes text,
+      activated_at timestamptz NOT NULL DEFAULT now(),
+      expires_at timestamptz
+    )
+  `);
+  await db.execute(sql`
     CREATE TABLE IF NOT EXISTS modules (
       id uuid PRIMARY KEY,
       course_slug varchar(100) NOT NULL REFERENCES courses(slug) ON DELETE CASCADE,

@@ -251,6 +251,15 @@ export async function listEnrollments(userId: string): Promise<string[]> {
   return rows.map((r) => r.courseSlug);
 }
 
+export async function unenrollUser(userId: string, courseSlug: string): Promise<boolean> {
+  const db = await getDb();
+  const deleted = await db
+    .delete(enrollments)
+    .where(and(eq(enrollments.userId, userId), eq(enrollments.courseSlug, courseSlug)))
+    .returning();
+  return deleted.length > 0;
+}
+
 export async function enrollUser(userId: string, courseSlug: string): Promise<void> {
   const db = await getDb();
   await db.insert(enrollments).values({ userId, courseSlug }).onConflictDoNothing();

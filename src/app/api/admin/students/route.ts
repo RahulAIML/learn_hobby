@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/adminGuard';
 import { listUsers } from '@/lib/auth/store';
+import { listPaidUsers } from '@/lib/auth/paidUsers';
 import { getStudentPerformanceSummary } from '@/lib/cbt/store';
 
 export const runtime = 'nodejs';
@@ -10,7 +11,9 @@ export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
   if ('response' in auth) return auth.response;
 
-  const users = await listUsers();
+  const [users, paidUsers] = await Promise.all([listUsers(), listPaidUsers()]);
+  const paidUserIds = new Set(paidUsers.map((p) => p.userId));
+
   const students = await Promise.all(
     users
       .filter((user) => user.role === 'student')
@@ -27,6 +30,7 @@ export async function GET(req: NextRequest) {
           goalOption: user.goalOption,
           createdAt: user.createdAt,
           lastLoginAt: user.lastLoginAt,
+          isPaid: paidUserIds.has(user.id),
           totalAttempts: performance.totalAttempts,
           averagePercentage: performance.averagePercentage,
           bestPercentage: performance.bestPercentage,

@@ -2,13 +2,24 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
-import { MOCK_RECENT_ACTIVITY } from '@/lib/admin/mockDashboardData';
+import { timeAgo } from '@/components/admin/DashboardHome';
+import type { RecentAttemptActivity } from '@/lib/admin/dashboardStats';
 
-/** UI-only for now — badge and dropdown use the same placeholder activity feed as the dashboard, no real notification store yet. */
+/** Real recent CBT-attempt activity, same source as the dashboard's Recent Activity feed — no mock data. */
 export const NotificationButton: React.FC = () => {
   const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<RecentAttemptActivity[] | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const items = MOCK_RECENT_ACTIVITY.slice(0, 4);
+
+  useEffect(() => {
+    fetch('/api/admin/dashboard')
+      .then(async (res) => {
+        if (!res.ok) return;
+        const body = await res.json();
+        if (body.success) setItems(body.recentActivity);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
@@ -29,7 +40,7 @@ export const NotificationButton: React.FC = () => {
         className="relative w-9 h-9 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
       >
         <Bell className="w-4 h-4" strokeWidth={2} />
-        <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-600" aria-hidden="true" />
+        {items && items.length > 0 && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-600" aria-hidden="true" />}
       </button>
 
       {open && (
@@ -37,17 +48,23 @@ export const NotificationButton: React.FC = () => {
           <div className="px-3 py-2 border-b border-slate-100">
             <p className="text-xs font-bold text-slate-900">Notifications</p>
           </div>
-          <ul className="max-h-72 overflow-y-auto">
-            {items.map((item) => (
-              <li key={item.id} className="px-3 py-2.5 border-b border-slate-50 last:border-0">
-                <p className="text-xs text-slate-700 leading-snug">
-                  <span className="font-semibold text-slate-900">{item.actor}</span> {item.action}{' '}
-                  <span className="font-medium">{item.target}</span>
-                </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">{item.timestamp}</p>
-              </li>
-            ))}
-          </ul>
+          {!items ? (
+            <p className="px-3 py-4 text-xs text-slate-400 text-center">Loading…</p>
+          ) : items.length === 0 ? (
+            <p className="px-3 py-4 text-xs text-slate-400 text-center">No recent activity.</p>
+          ) : (
+            <ul className="max-h-72 overflow-y-auto">
+              {items.map((item) => (
+                <li key={item.attemptId} className="px-3 py-2.5 border-b border-slate-50 last:border-0">
+                  <p className="text-xs text-slate-700 leading-snug">
+                    <span className="font-semibold text-slate-900">{item.studentName}</span> submitted{' '}
+                    <span className="font-medium">{item.assessmentTitle}</span>
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(item.submittedAt)}</p>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>
