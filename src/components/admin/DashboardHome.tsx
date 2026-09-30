@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Users, BookOpen, ClipboardCheck, Clock3, Sparkles, UserPlus, FolderPlus, Settings2, Loader2, AlertCircle } from 'lucide-react';
+import { Users, BookOpen, ClipboardCheck, Clock3, Sparkles, UserPlus, FolderPlus, Settings2, ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
 import { StatCard } from './ui/StatCard';
 import { SectionHeader } from './ui/SectionHeader';
 import { DataTable } from './ui/DataTable';
@@ -19,6 +19,7 @@ const QUICK_ACTIONS = [
   { label: 'Add a Course', href: '/admin/courses', icon: FolderPlus },
   { label: 'View Students', href: '/admin/students', icon: UserPlus },
   { label: 'Platform Settings', href: '/admin/settings', icon: Settings2 },
+  { label: 'Super Admin Control Center', href: '/super-admin', icon: ShieldCheck },
 ];
 
 export function timeAgo(iso: string): string {

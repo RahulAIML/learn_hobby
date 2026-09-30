@@ -56,6 +56,23 @@ async function main() {
     console.log('Seeded demo admin: admin@gurukul.dev / admin12345');
   }
 
+  // Super Admin — a distinct, higher-privilege role/account from the demo
+  // admin above, not the same login. Powers the Super Admin Control Center.
+  const existingSuperAdmin = await db.select().from(users).where(eq(users.email, 'superadmin@gurukul.dev')).limit(1);
+  if (existingSuperAdmin.length > 0) {
+    console.log('Super admin already seeded, skipping.');
+  } else {
+    await db.insert(users).values({
+      id: randomUUID(),
+      username: 'super_admin',
+      email: 'superadmin@gurukul.dev',
+      name: 'Gurukul Super Admin',
+      passwordHash: hashPassword('SuperAdmin@12345'),
+      role: 'super_admin',
+    });
+    console.log('Seeded super admin: superadmin@gurukul.dev / SuperAdmin@12345');
+  }
+
   // Flagship course + module + assessment
   const existingCourse = await db.select().from(courses).where(eq(courses.slug, 'data-science')).limit(1);
   if (existingCourse.length > 0) {

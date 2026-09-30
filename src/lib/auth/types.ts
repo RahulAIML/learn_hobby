@@ -1,4 +1,10 @@
-export type UserRole = 'student' | 'admin';
+/**
+ * `super_admin` is a distinct, higher-privilege role from `admin` — not a
+ * label on the same account. requireAdmin() accepts either (a super admin
+ * can do everything a regular admin can); requireSuperAdmin() accepts only
+ * `super_admin`, gating the Super Admin Control Center.
+ */
+export type UserRole = 'student' | 'admin' | 'super_admin';
 
 export interface User {
   id: string;

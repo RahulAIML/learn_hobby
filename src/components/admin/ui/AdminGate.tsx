@@ -44,8 +44,25 @@ export function getAdminGate(user: SessionUser | null): React.ReactNode | null {
   if (!user) {
     return <GateMessage icon={LogIn} title="Sign In Required" message="Please sign in with an admin account to continue." showLogin />;
   }
-  if (user.role !== 'admin') {
+  // A super_admin can do everything a regular admin can — this is the union, not a separate check.
+  if (user.role !== 'admin' && user.role !== 'super_admin') {
     return <GateMessage icon={ShieldAlert} title="Admin Access Required" message="Your account does not have admin access." />;
+  }
+  return null;
+}
+
+/**
+ * Super-admin-only gate for /super-admin/* pages. Deliberately rejects a
+ * regular `admin` account — super_admin is a distinct, higher-privilege
+ * role with its own separate login, not the same account viewed
+ * differently.
+ */
+export function getSuperAdminGate(user: SessionUser | null): React.ReactNode | null {
+  if (!user) {
+    return <GateMessage icon={LogIn} title="Sign In Required" message="Please sign in with a Super Admin account to continue." showLogin />;
+  }
+  if (user.role !== 'super_admin') {
+    return <GateMessage icon={ShieldAlert} title="Super Admin Access Required" message="Your account does not have Super Admin access." />;
   }
   return null;
 }
