@@ -1,30 +1,44 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BookOpen } from 'lucide-react';
 import { PageHeader } from '@/components/superAdmin/ui/PageHeader';
 import { FilterBar } from '@/components/superAdmin/ui/FilterBar';
-import { StatusBadge } from '@/components/superAdmin/ui/StatusBadge';
-import { RowActionsMenu } from '@/components/superAdmin/ui/RowActionsMenu';
-import { EmptyState } from '@/components/superAdmin/ui/EmptyState';
+import { EmptyState, LoadingState } from '@/components/superAdmin/ui/EmptyState';
 import { DataTable } from '@/components/admin/ui/DataTable';
 import { useTableControls } from '@/lib/superAdmin/useTableControls';
-import { mockCoursesOverview } from '@/lib/superAdmin/mockData';
+import type { CourseOverviewRow } from '@/lib/superAdmin/realData';
 
 export const CourseOverviewTable: React.FC = () => {
-  const { query, setQuery, paged } = useTableControls({ rows: mockCoursesOverview, searchFields: (c) => [c.title, c.slug], pageSize: 20 });
+  const [courses, setCourses] = useState<CourseOverviewRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/super-admin/courses')
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body?.error?.message ?? 'Could not load courses.');
+        setCourses(body.data.courses);
+      })
+      .catch((err: Error) => setError(err.message));
+  }, []);
+
+  const { query, setQuery, paged } = useTableControls({ rows: courses ?? [], searchFields: (c) => [c.title, c.slug], pageSize: 20 });
 
   return (
     <div className="space-y-6">
       <PageHeader title="Courses" description="Every course offered on the platform." />
+      {error && <p className="text-sm text-red-700">{error}</p>}
       <FilterBar query={query} onQueryChange={setQuery} placeholder="Search by course title or slug…" />
       <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-        {mockCoursesOverview.length === 0 ? (
+        {!courses ? (
+          <LoadingState />
+        ) : courses.length === 0 ? (
           <EmptyState icon={BookOpen} title="No courses yet." />
         ) : (
           <DataTable
             rows={paged}
-            rowKey={(c) => c.id}
+            rowKey={(c) => c.slug}
             emptyLabel="No courses match your search."
             columns={[
               {
@@ -37,10 +51,8 @@ export const CourseOverviewTable: React.FC = () => {
                   </div>
                 ),
               },
-              { key: 'students', header: 'Students', align: 'right', render: (c) => c.students.toLocaleString() },
-              { key: 'modules', header: 'Modules', align: 'right', render: (c) => c.modules },
-              { key: 'status', header: 'Status', render: (c) => <StatusBadge status={c.status} /> },
-              { key: 'actions', header: '', align: 'right', render: () => <RowActionsMenu actions={[{ label: 'View', onClick: () => {} }, { label: 'Manage', onClick: () => {} }]} /> },
+              { key: 'studentCount', header: 'Students', align: 'right', render: (c) => c.studentCount.toLocaleString() },
+              { key: 'moduleCount', header: 'Modules', align: 'right', render: (c) => c.moduleCount },
             ]}
           />
         )}

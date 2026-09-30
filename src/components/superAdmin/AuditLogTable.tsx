@@ -1,49 +1,46 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollText } from 'lucide-react';
 import { PageHeader } from '@/components/superAdmin/ui/PageHeader';
 import { FilterBar } from '@/components/superAdmin/ui/FilterBar';
-import { StatusBadge } from '@/components/superAdmin/ui/StatusBadge';
-import { EmptyState } from '@/components/superAdmin/ui/EmptyState';
+import { EmptyState, LoadingState } from '@/components/superAdmin/ui/EmptyState';
 import { Pagination } from '@/components/superAdmin/ui/Pagination';
 import { DataTable } from '@/components/admin/ui/DataTable';
 import { useTableControls } from '@/lib/superAdmin/useTableControls';
-import { mockAuditLogs } from '@/lib/superAdmin/mockData';
-
-type StatusFilter = 'all' | 'Success' | 'Failed';
+import type { ActivityEntry } from '@/lib/superAdmin/realData';
 
 export const AuditLogTable: React.FC = () => {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const filtered = mockAuditLogs.filter((l) => statusFilter === 'all' || l.status === statusFilter);
+  const [entries, setEntries] = useState<ActivityEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/super-admin/activity?limit=50')
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body?.error?.message ?? 'Could not load activity.');
+        setEntries(body.data.activity);
+      })
+      .catch((err: Error) => setError(err.message));
+  }, []);
+
   const { query, setQuery, page, setPage, pageCount, paged, totalItems, pageSize } = useTableControls({
-    rows: filtered,
-    searchFields: (l) => [l.user, l.action, l.module],
+    rows: entries ?? [],
+    searchFields: (l) => [l.actor, l.action, l.module],
   });
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Audit Logs" description="A security-grade record of every administrative action on the platform." />
+      <PageHeader title="Activity Log" description="Real, timestamped platform events — submissions, enrollments, and publishes. No dedicated audit_log table exists yet, so this surfaces genuine derived events rather than a fabricated admin-action log." />
 
-      <FilterBar
-        query={query}
-        onQueryChange={setQuery}
-        placeholder="Search by user, action, or module…"
-        filters={[
-          {
-            value: statusFilter,
-            onChange: (v) => setStatusFilter(v as StatusFilter),
-            options: [
-              { value: 'all', label: 'All' },
-              { value: 'Success', label: 'Success' },
-              { value: 'Failed', label: 'Failed' },
-            ],
-          },
-        ]}
-      />
+      {error && <p className="text-sm text-red-700">{error}</p>}
+
+      <FilterBar query={query} onQueryChange={setQuery} placeholder="Search by user, action, or module…" />
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-        {mockAuditLogs.length === 0 ? (
+        {!entries ? (
+          <LoadingState />
+        ) : entries.length === 0 ? (
           <EmptyState icon={ScrollText} title="No activity recorded yet." />
         ) : (
           <>
@@ -52,13 +49,10 @@ export const AuditLogTable: React.FC = () => {
               rowKey={(l) => l.id}
               emptyLabel="No log entries match your search."
               columns={[
-                { key: 'timestamp', header: 'Timestamp', render: (l) => <span className="text-slate-400 whitespace-nowrap">{l.timestamp}</span> },
-                { key: 'user', header: 'User', render: (l) => <p className="font-semibold text-slate-900">{l.user}</p> },
-                { key: 'role', header: 'Role', render: (l) => l.role },
+                { key: 'timestamp', header: 'Timestamp', render: (l) => <span className="text-slate-400 whitespace-nowrap">{new Date(l.timestamp).toLocaleString()}</span> },
+                { key: 'actor', header: 'Actor', render: (l) => <p className="font-semibold text-slate-900">{l.actor}</p> },
                 { key: 'action', header: 'Action', render: (l) => l.action },
                 { key: 'module', header: 'Module', render: (l) => <span className="text-slate-400">{l.module}</span> },
-                { key: 'device', header: 'IP / Device', render: (l) => <span className="text-slate-400">{l.device}</span> },
-                { key: 'status', header: 'Status', render: (l) => <StatusBadge status={l.status} /> },
               ]}
             />
             <Pagination page={page} pageCount={pageCount} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />

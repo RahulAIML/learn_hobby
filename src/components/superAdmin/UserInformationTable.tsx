@@ -1,33 +1,47 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { UserCog } from 'lucide-react';
 import { PageHeader } from '@/components/superAdmin/ui/PageHeader';
 import { FilterBar } from '@/components/superAdmin/ui/FilterBar';
 import { StatusBadge } from '@/components/superAdmin/ui/StatusBadge';
-import { EmptyState } from '@/components/superAdmin/ui/EmptyState';
+import { EmptyState, LoadingState } from '@/components/superAdmin/ui/EmptyState';
 import { Pagination } from '@/components/superAdmin/ui/Pagination';
 import { DataTable } from '@/components/admin/ui/DataTable';
 import { useTableControls } from '@/lib/superAdmin/useTableControls';
-import { mockUsers } from '@/lib/superAdmin/mockData';
+import type { UserInfoRow } from '@/lib/superAdmin/realData';
 
-type StatusFilter = 'all' | 'Active' | 'Inactive' | 'Suspended';
-type RoleFilter = 'all' | 'Student' | 'Admin' | 'Moderator';
+type RoleFilter = 'all' | 'student' | 'admin' | 'super_admin';
+
+const ROLE_LABEL: Record<string, string> = { student: 'Student', admin: 'Admin', super_admin: 'Super Admin' };
 
 export const UserInformationTable: React.FC = () => {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [users, setUsers] = useState<UserInfoRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
 
-  const filteredByFacet = mockUsers.filter((u) => (statusFilter === 'all' || u.status === statusFilter) && (roleFilter === 'all' || u.role === roleFilter));
+  useEffect(() => {
+    fetch('/api/super-admin/users')
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body?.error?.message ?? 'Could not load users.');
+        setUsers(body.data.users);
+      })
+      .catch((err: Error) => setError(err.message));
+  }, []);
+
+  const filteredByFacet = (users ?? []).filter((u) => roleFilter === 'all' || u.role === roleFilter);
 
   const { query, setQuery, page, setPage, pageCount, paged, totalItems, pageSize } = useTableControls({
     rows: filteredByFacet,
-    searchFields: (u) => [u.name, u.username, u.email, u.mobile],
+    searchFields: (u) => [u.name, u.username, u.email, u.mobile ?? ''],
   });
 
   return (
     <div className="space-y-6">
-      <PageHeader title="User Information" description="Every registered account — students, admins, and moderators." />
+      <PageHeader title="User Information" description="Every registered account — students, admins, and super admins." />
+
+      {error && <p className="text-sm text-red-700">{error}</p>}
 
       <FilterBar
         query={query}
@@ -35,30 +49,22 @@ export const UserInformationTable: React.FC = () => {
         placeholder="Search by name, username, email, or mobile…"
         filters={[
           {
-            value: statusFilter,
-            onChange: (v) => setStatusFilter(v as StatusFilter),
-            options: [
-              { value: 'all', label: 'All Status' },
-              { value: 'Active', label: 'Active' },
-              { value: 'Inactive', label: 'Inactive' },
-              { value: 'Suspended', label: 'Suspended' },
-            ],
-          },
-          {
             value: roleFilter,
             onChange: (v) => setRoleFilter(v as RoleFilter),
             options: [
               { value: 'all', label: 'All Roles' },
-              { value: 'Student', label: 'Student' },
-              { value: 'Admin', label: 'Admin' },
-              { value: 'Moderator', label: 'Moderator' },
+              { value: 'student', label: 'Student' },
+              { value: 'admin', label: 'Admin' },
+              { value: 'super_admin', label: 'Super Admin' },
             ],
           },
         ]}
       />
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-        {mockUsers.length === 0 ? (
+        {!users ? (
+          <LoadingState />
+        ) : users.length === 0 ? (
           <EmptyState icon={UserCog} title="No users yet." />
         ) : (
           <>
@@ -78,11 +84,15 @@ export const UserInformationTable: React.FC = () => {
                   ),
                 },
                 { key: 'email', header: 'Email', render: (u) => u.email },
-                { key: 'mobile', header: 'Mobile', render: (u) => <span className="text-slate-400">{u.mobile}</span> },
-                { key: 'role', header: 'Role', render: (u) => u.role },
-                { key: 'status', header: 'Status', render: (u) => <StatusBadge status={u.status} /> },
-                { key: 'joined', header: 'Joined', render: (u) => <span className="text-slate-400">{u.joined}</span> },
-                { key: 'lastActive', header: 'Last Active', align: 'right', render: (u) => <span className="text-slate-400">{u.lastActive}</span> },
+                { key: 'mobile', header: 'Mobile', render: (u) => <span className="text-slate-400">{u.mobile ?? '—'}</span> },
+                { key: 'role', header: 'Role', render: (u) => <StatusBadge status={ROLE_LABEL[u.role] ?? u.role} /> },
+                { key: 'createdAt', header: 'Joined', render: (u) => <span className="text-slate-400">{new Date(u.createdAt).toLocaleDateString()}</span> },
+                {
+                  key: 'lastLoginAt',
+                  header: 'Last Active',
+                  align: 'right',
+                  render: (u) => <span className="text-slate-400">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : 'Never'}</span>,
+                },
               ]}
             />
             <Pagination page={page} pageCount={pageCount} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} />

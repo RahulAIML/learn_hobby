@@ -2,8 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Search, X, Users, ShieldCheck, BookOpen, ClipboardCheck, FolderOpen } from 'lucide-react';
-import { mockStudentsOverview, mockAdmins, mockCoursesOverview, mockAssessmentsOverview, mockDocumentsOverview } from '@/lib/superAdmin/mockData';
+import { Search, X, Users, ShieldCheck, BookOpen, ClipboardCheck, FolderOpen, Loader2 } from 'lucide-react';
 
 interface SearchResult {
   id: string;
@@ -14,34 +13,73 @@ interface SearchResult {
   kind: string;
 }
 
-/** Conceptual cross-entity search over mock data only — no backend search yet. */
-function buildIndex(): SearchResult[] {
-  return [
-    ...mockStudentsOverview.slice(0, 12).map((s) => ({ id: s.id, label: s.name, sublabel: s.email, href: '/super-admin/students', icon: Users, kind: 'Student' })),
-    ...mockAdmins.map((a) => ({ id: a.id, label: a.name, sublabel: a.email, href: '/super-admin/admins', icon: ShieldCheck, kind: 'Admin' })),
-    ...mockCoursesOverview.map((c) => ({ id: c.id, label: c.title, sublabel: `${c.students} students`, href: '/super-admin/courses', icon: BookOpen, kind: 'Course' })),
-    ...mockAssessmentsOverview.map((a) => ({ id: a.id, label: a.title, sublabel: a.course, href: '/super-admin/assessments', icon: ClipboardCheck, kind: 'Assessment' })),
-    ...mockDocumentsOverview.map((d) => ({ id: d.id, label: d.name, sublabel: d.course, href: '/super-admin/documents', icon: FolderOpen, kind: 'Document' })),
-  ];
-}
-
-const INDEX = buildIndex();
-
 interface GlobalSearchProps {
   open: boolean;
   onClose: () => void;
 }
 
+/** Real cross-entity search — fetches live lists from the Super Admin API the first time the modal opens, then filters client-side. */
 export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose }) => {
   const [query, setQuery] = useState('');
+  const [index, setIndex] = useState<SearchResult[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setQuery('');
       setTimeout(() => inputRef.current?.focus(), 0);
+      if (!index) {
+        Promise.all([
+          fetch('/api/super-admin/students').then((r) => r.json()),
+          fetch('/api/super-admin/admins').then((r) => r.json()),
+          fetch('/api/super-admin/courses').then((r) => r.json()),
+          fetch('/api/super-admin/assessments').then((r) => r.json()),
+          fetch('/api/super-admin/documents').then((r) => r.json()),
+        ])
+          .then(([studentsRes, adminsRes, coursesRes, assessmentsRes, documentsRes]) => {
+            const results: SearchResult[] = [
+              ...(studentsRes.data?.students ?? [])
+                .slice(0, 20)
+                .map((s: { id: string; name: string; email: string }) => ({ id: s.id, label: s.name, sublabel: s.email, href: '/super-admin/students', icon: Users, kind: 'Student' })),
+              ...(adminsRes.data?.admins ?? []).map((a: { id: string; name: string; email: string }) => ({
+                id: a.id,
+                label: a.name,
+                sublabel: a.email,
+                href: '/super-admin/admins',
+                icon: ShieldCheck,
+                kind: 'Admin',
+              })),
+              ...(coursesRes.data?.courses ?? []).map((c: { slug: string; title: string; studentCount: number }) => ({
+                id: c.slug,
+                label: c.title,
+                sublabel: `${c.studentCount} students`,
+                href: '/super-admin/courses',
+                icon: BookOpen,
+                kind: 'Course',
+              })),
+              ...(assessmentsRes.data?.assessments ?? []).map((a: { id: string; title: string; courseTitle: string }) => ({
+                id: a.id,
+                label: a.title,
+                sublabel: a.courseTitle,
+                href: '/super-admin/assessments',
+                icon: ClipboardCheck,
+                kind: 'Assessment',
+              })),
+              ...(documentsRes.data?.documents ?? []).map((d: { id: string; title: string; courseTitle: string }) => ({
+                id: d.id,
+                label: d.title,
+                sublabel: d.courseTitle,
+                href: '/super-admin/documents',
+                icon: FolderOpen,
+                kind: 'Document',
+              })),
+            ];
+            setIndex(results);
+          })
+          .catch(() => setIndex([]));
+      }
     }
-  }, [open]);
+  }, [open, index]);
 
   useEffect(() => {
     if (!open) return;
@@ -58,9 +96,9 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose }) => 
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return INDEX.filter((r) => r.label.toLowerCase().includes(q) || r.sublabel.toLowerCase().includes(q)).slice(0, 8);
-  }, [query]);
+    if (!q || !index) return [];
+    return index.filter((r) => r.label.toLowerCase().includes(q) || r.sublabel.toLowerCase().includes(q)).slice(0, 8);
+  }, [query, index]);
 
   if (!open) return null;
 
@@ -84,7 +122,14 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose }) => 
             </button>
           </div>
 
-          {query.trim() && (
+          {!index && query.trim() && (
+            <div className="flex items-center justify-center gap-2 py-8 text-slate-400">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-xs">Loading…</span>
+            </div>
+          )}
+
+          {index && query.trim() && (
             <div className="max-h-80 overflow-y-auto">
               {results.length === 0 ? (
                 <p className="px-4 py-8 text-center text-xs text-slate-400">No results for &ldquo;{query}&rdquo;.</p>

@@ -1,39 +1,58 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Users, UserCheck, UserX, UserPlus } from 'lucide-react';
 import { PageHeader } from '@/components/superAdmin/ui/PageHeader';
 import { FilterBar } from '@/components/superAdmin/ui/FilterBar';
-import { StatusBadge } from '@/components/superAdmin/ui/StatusBadge';
-import { RowActionsMenu } from '@/components/superAdmin/ui/RowActionsMenu';
-import { EmptyState } from '@/components/superAdmin/ui/EmptyState';
+import { EmptyState, LoadingState } from '@/components/superAdmin/ui/EmptyState';
 import { Pagination } from '@/components/superAdmin/ui/Pagination';
 import { StatCard } from '@/components/admin/ui/StatCard';
 import { DataTable } from '@/components/admin/ui/DataTable';
 import { useTableControls } from '@/lib/superAdmin/useTableControls';
-import { mockStudentsOverview, mockStudentStats } from '@/lib/superAdmin/mockData';
+import type { StudentOverviewRow, StudentStats } from '@/lib/superAdmin/realData';
 
 export const StudentOverviewTable: React.FC = () => {
+  const [students, setStudents] = useState<StudentOverviewRow[] | null>(null);
+  const [stats, setStats] = useState<StudentStats | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/super-admin/students')
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body?.error?.message ?? 'Could not load students.');
+        setStudents(body.data.students);
+        setStats(body.data.stats);
+      })
+      .catch((err: Error) => setError(err.message));
+  }, []);
+
   const { query, setQuery, page, setPage, pageCount, paged, totalItems, pageSize } = useTableControls({
-    rows: mockStudentsOverview,
-    searchFields: (s) => [s.name, s.email, s.course, s.goal],
+    rows: students ?? [],
+    searchFields: (s) => [s.name, s.email, s.goal ?? '', ...s.courses],
   });
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Students" description="Every student across every course, with real-time status." />
+      <PageHeader title="Students" description="Every student across every course." />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard label="Total Students" value={mockStudentStats.total.toLocaleString()} icon={Users} />
-        <StatCard label="Active Students" value={mockStudentStats.active.toLocaleString()} icon={UserCheck} />
-        <StatCard label="Inactive Students" value={mockStudentStats.inactive.toLocaleString()} icon={UserX} />
-        <StatCard label="New This Week" value={String(mockStudentStats.newThisWeek)} icon={UserPlus} delta={{ value: '+214', direction: 'up' }} />
-      </div>
+      {error && <p className="text-sm text-red-700">{error}</p>}
+
+      {stats && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <StatCard label="Total Students" value={stats.total.toLocaleString()} icon={Users} />
+          <StatCard label="Active (30d)" value={stats.activeLast30Days.toLocaleString()} icon={UserCheck} />
+          <StatCard label="Never Logged In" value={stats.neverLoggedIn.toLocaleString()} icon={UserX} />
+          <StatCard label="New This Week" value={String(stats.newLast7Days)} icon={UserPlus} />
+        </div>
+      )}
 
       <FilterBar query={query} onQueryChange={setQuery} placeholder="Search by student, email, course, or goal…" />
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-        {mockStudentsOverview.length === 0 ? (
+        {!students ? (
+          <LoadingState />
+        ) : students.length === 0 ? (
           <EmptyState icon={Users} title="No students yet." />
         ) : (
           <>
@@ -52,17 +71,16 @@ export const StudentOverviewTable: React.FC = () => {
                     </div>
                   ),
                 },
-                { key: 'course', header: 'Course', render: (s) => s.course },
-                { key: 'goal', header: 'Goal', render: (s) => <span className="text-slate-400">{s.goal}</span> },
-                { key: 'age', header: 'Age', align: 'right', render: (s) => s.age },
-                { key: 'status', header: 'Status', render: (s) => <StatusBadge status={s.status} /> },
-                { key: 'joined', header: 'Joined', render: (s) => <span className="text-slate-400">{s.joined}</span> },
-                { key: 'lastActive', header: 'Last Active', render: (s) => <span className="text-slate-400">{s.lastActive}</span> },
+                { key: 'courses', header: 'Courses', render: (s) => (s.courses.length ? s.courses.join(', ') : <span className="text-slate-400">None</span>) },
+                { key: 'goal', header: 'Goal', render: (s) => <span className="text-slate-400">{s.goal ?? '—'}</span> },
+                { key: 'age', header: 'Age', align: 'right', render: (s) => s.age ?? '—' },
+                { key: 'totalAttempts', header: 'Attempts', align: 'right', render: (s) => s.totalAttempts },
+                { key: 'averagePercentage', header: 'Avg. Score', align: 'right', render: (s) => (s.averagePercentage !== null ? `${s.averagePercentage}%` : '—') },
+                { key: 'createdAt', header: 'Joined', render: (s) => <span className="text-slate-400">{new Date(s.createdAt).toLocaleDateString()}</span> },
                 {
-                  key: 'actions',
-                  header: '',
-                  align: 'right',
-                  render: () => <RowActionsMenu actions={[{ label: 'View Profile', onClick: () => {} }, { label: 'Message', onClick: () => {} }]} />,
+                  key: 'lastLoginAt',
+                  header: 'Last Active',
+                  render: (s) => <span className="text-slate-400">{s.lastLoginAt ? new Date(s.lastLoginAt).toLocaleDateString() : 'Never'}</span>,
                 },
               ]}
             />

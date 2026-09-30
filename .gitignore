@@ -6,3 +6,8 @@ node_modules/
 .env
 .env.local
 .env.*.local
+
+# Local e2e/browser test artifacts and ad-hoc exports — never commit these
+.browser-e2e-*/
+live-preview-*.png
+project.zip
