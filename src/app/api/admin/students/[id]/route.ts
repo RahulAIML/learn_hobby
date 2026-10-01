@@ -41,7 +41,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   return NextResponse.json({
     success: true,
-    profile: toPublicUser(user),
+    profile: {
+      ...toPublicUser(user),
+      createdAt: user.createdAt,
+      lastLoginAt: user.lastLoginAt,
+    },
     enrollments,
     paid: paidRecord ?? null,
     performance: {

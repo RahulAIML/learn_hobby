@@ -18,19 +18,29 @@ import {
   BookOpen,
   Plus,
   Trash2,
+  Mail,
+  Phone,
+  Calendar,
+  User,
+  LogIn,
 } from 'lucide-react';
 import { GOAL_TAXONOMY, findGoalSubcategory } from '@/lib/profile/goalTaxonomy';
 
 interface StudentDetail {
   profile: {
     id: string;
+    username: string;
     name: string;
     email: string;
     mobile: string | null;
+    phoneNo: string | null;
     age: number | null;
     goalCategory: string | null;
     goalSubcategory: string | null;
     goalOption: string | null;
+    profileCompletedAt: string | null;
+    createdAt: string;
+    lastLoginAt: string | null;
   };
   enrollments: string[];
   paid: { plan: string; amount: number | null; currency: string | null } | null;
@@ -209,10 +219,10 @@ export const AdminStudentDetail: React.FC<{ studentId: string }> = ({ studentId 
   }
 
   const { profile, enrollments, paid, performance, attempts } = data;
-  const goalLabel =
-    profile.goalCategory && profile.goalSubcategory && profile.goalOption
-      ? findGoalSubcategory(profile.goalCategory, profile.goalSubcategory)?.options.find((o) => o.value === profile.goalOption)?.label
-      : null;
+
+  const goalCategory = GOAL_TAXONOMY.find((c) => c.value === profile.goalCategory);
+  const goalSubcategory = goalCategory ? findGoalSubcategory(profile.goalCategory!, profile.goalSubcategory!) : null;
+  const goalOptionLabel = goalSubcategory?.options.find((o) => o.value === profile.goalOption)?.label ?? null;
 
   const formCategory = GOAL_TAXONOMY.find((c) => c.value === form.goalCategory);
   const formSubcategory = formCategory?.subcategories.find((s) => s.value === form.goalSubcategory);
@@ -228,10 +238,7 @@ export const AdminStudentDetail: React.FC<{ studentId: string }> = ({ studentId 
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-950 font-heading tracking-tight">{profile.name}</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            {profile.email} {profile.mobile ? `· ${profile.mobile}` : ''} {profile.age ? `· Age ${profile.age}` : ''}
-          </p>
-          {goalLabel && <p className="text-xs text-slate-400 mt-1">Goal: {goalLabel}</p>}
+          <p className="text-xs text-slate-400 mt-1">@{profile.username}</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {paid ? (
@@ -262,6 +269,74 @@ export const AdminStudentDetail: React.FC<{ studentId: string }> = ({ studentId 
           )}
         </div>
       </div>
+
+      {/* Profile info card */}
+      {!editing && (
+        <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
+          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Profile Information</h2>
+          <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
+            <div className="flex items-center gap-2">
+              <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+              <div>
+                <dt className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Email</dt>
+                <dd className="text-sm text-slate-900">{profile.email}</dd>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+              <div>
+                <dt className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Mobile</dt>
+                <dd className="text-sm text-slate-900">{profile.mobile || '—'}</dd>
+              </div>
+            </div>
+            {profile.phoneNo && (
+              <div className="flex items-center gap-2">
+                <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                <div>
+                  <dt className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Phone (alt)</dt>
+                  <dd className="text-sm text-slate-900">{profile.phoneNo}</dd>
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <User className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+              <div>
+                <dt className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Age</dt>
+                <dd className="text-sm text-slate-900">{profile.age ?? '—'}</dd>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+              <div>
+                <dt className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Joined</dt>
+                <dd className="text-sm text-slate-900">{formatDate(profile.createdAt)}</dd>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <LogIn className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+              <div>
+                <dt className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Last Active</dt>
+                <dd className="text-sm text-slate-900">{profile.lastLoginAt ? formatDate(profile.lastLoginAt) : 'Never'}</dd>
+              </div>
+            </div>
+            {goalCategory && goalSubcategory && goalOptionLabel && (
+              <div className="sm:col-span-2 flex items-start gap-2">
+                <Target className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <dt className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Goal</dt>
+                  <dd className="text-sm text-slate-900">
+                    <span className="text-slate-500">{goalCategory.label}</span>
+                    <span className="mx-1 text-slate-300">›</span>
+                    <span className="text-slate-500">{goalSubcategory.label}</span>
+                    <span className="mx-1 text-slate-300">›</span>
+                    <span className="font-semibold">{goalOptionLabel}</span>
+                  </dd>
+                </div>
+              </div>
+            )}
+          </dl>
+        </div>
+      )}
 
       {actionError && (
         <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 mt-4">

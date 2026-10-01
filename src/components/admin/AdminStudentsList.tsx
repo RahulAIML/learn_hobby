@@ -12,11 +12,18 @@ interface StudentSummary {
   mobile: string | null;
   age: number | null;
   goalCategory: string | null;
+  createdAt: string;
+  lastLoginAt: string | null;
   isPaid: boolean;
   totalAttempts: number;
   averagePercentage: number | null;
   bestPercentage: number | null;
   latestPercentage: number | null;
+}
+
+function shortDate(value: string | null): string {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 type PlanFilter = 'all' | 'paid' | 'free';
@@ -125,7 +132,10 @@ export const AdminStudentsList: React.FC = () => {
                     )}
                   </div>
                   <p className="text-xs text-slate-500 truncate">
-                    {s.email} {s.age ? `· Age ${s.age}` : ''} {s.goalCategory ? `· ${findGoalCategory(s.goalCategory)?.label ?? s.goalCategory}` : ''}
+                    {s.email}{s.mobile ? ` · ${s.mobile}` : ''}{s.age ? ` · Age ${s.age}` : ''}{s.goalCategory ? ` · ${findGoalCategory(s.goalCategory)?.label ?? s.goalCategory}` : ''}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Joined {shortDate(s.createdAt)}{s.lastLoginAt ? ` · Active ${shortDate(s.lastLoginAt)}` : ''}
                   </p>
                 </div>
                 <div className="flex items-center gap-4 flex-shrink-0">
