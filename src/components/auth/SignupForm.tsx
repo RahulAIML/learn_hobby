@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { GOAL_TAXONOMY } from '@/lib/profile/goalTaxonomy';
 
 export const SignupForm: React.FC = () => {
@@ -16,6 +16,7 @@ export const SignupForm: React.FC = () => {
   const [categoryValue, setCategoryValue] = useState('');
   const [subcategoryValue, setSubcategoryValue] = useState('');
   const [optionValue, setOptionValue] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -187,12 +188,33 @@ export const SignupForm: React.FC = () => {
         </div>
       )}
 
-      {field('password', 'Password', password, setPassword, {
-        type: 'password',
-        placeholder: '••••••••',
-        autoComplete: 'new-password',
-        required: true,
-      })}
+      <div>
+        <label htmlFor="password" className="block text-xs font-bold text-slate-700 mb-1.5">
+          Password
+        </label>
+        <div className="relative">
+          <input
+            id="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
+            placeholder="••••••••"
+            required
+            className="w-full px-4 py-3 pr-11 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/40 focus:border-red-400 transition-colors disabled:opacity-60"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            tabIndex={-1}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
 
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3">
